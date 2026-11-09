@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>FixTools Revived</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; box-sizing: border-box;
+         font: 16px/1.5 system-ui, sans-serif; text-align: center; }
+  a { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <p id="status">Finding FixTools...</p>
+  <noscript><p>This page needs JavaScript. <a href="url.txt">See the current address</a>.</p></noscript>
+</main>
+<script>
+  // url.txt is rewritten by publish-url.ps1 each time the tunnel starts.
+  // The query string gets past the Pages cache (ten minutes) so a new address works at once.
+  (async () => {
+    const status = document.getElementById('status');
+    try {
+      const response = await fetch('url.txt?t=' + Date.now(), { cache: 'no-store' });
+      if (!response.ok) throw new Error(String(response.status));
+      const url = (await response.text()).trim();
+      // Only ever go to a Cloudflare quick tunnel, whatever the file says.
+      if (!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) throw new Error('bad address');
+      location.replace(url + '/' + location.hash);
+    } catch (error) {
+      status.textContent = "Couldn't read the address. Reload in a minute.";
+    }
+  })();
+</script>
+</body>
+</html>
