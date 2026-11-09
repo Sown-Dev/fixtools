@@ -39,6 +39,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .toggle { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 15px; cursor: pointer; }
 .toggle:hover { border-color: var(--accent); }
+.toggle.small { margin-top: 6px; padding: 3px 11px; font-size: 12px; }
 .toggle[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 
 .entry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }

@@ -41,11 +41,12 @@ function letter(n) {
 }
 
 /** Every entry in transport order, with its Type. */
-function ordered(input) {
+function ordered(input, jobGroupOnly) {
   const out = [];
   for (const id of TRANSPORT_ORDER) {
     const category = CATEGORIES.find(c => c.id === id);
-    for (const name of rows(input[id])) out.push({ type: category.type, name });
+    const suffix = id === 'jobs' && jobGroupOnly ? ' [Job Group Only]' : '';
+    for (const name of rows(input[id])) out.push({ type: category.type, name: name + suffix });
   }
   return out;
 }
@@ -55,9 +56,9 @@ function transport(number, from, to, entries) {
   return `Transport ${number}\n\n${lines.join('\n')}`;
 }
 
-/** The path of a job's group: down to its last part that doesn't start with a number. */
+/** The path of a job's group: down to its last part that doesn't start with a number (a numbered part is a leaf). */
 function groupPath(job) {
-  const parts = job.split('\\').map(p => p.trim()).filter(Boolean);
+  const parts = job.split(/[\\/]/).map(p => p.trim()).filter(Boolean);
   while (parts.length && /^\d/.test(parts[parts.length - 1])) parts.pop();
   return parts;
 }
@@ -78,11 +79,11 @@ export function allConfigItems(jobsText) {
 
 /**
  * input: textbox text by category id, only for the toggled-on ones.
- * options: { mode: 'int', target: 'INT' | 'UAT' } or { mode: 'prod' }.
+ * options: { mode: 'int', target: 'INT' | 'UAT' } or { mode: 'prod' }, and jobGroupOnly to mark every job.
  * Gives the output text, and for prod the Implementation, Config Item and all-config-items text.
  */
 export function compose(input, options) {
-  const entries = ordered(input);
+  const entries = ordered(input, options.jobGroupOnly);
   if (!entries.length) return { text: '', implementation: '', configItem: '', allConfigItems: '' };
   if (options.mode !== 'prod') {
     return { text: transport(1, SOURCE_OF[options.target], options.target, entries), implementation: '', configItem: '', allConfigItems: '' };

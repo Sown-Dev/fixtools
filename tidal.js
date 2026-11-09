@@ -42,7 +42,7 @@ export function mountTidal(root) {
   function refresh() {
     const input = {};
     for (const c of categories) if (c.on) input[c.def.id] = c.box.value;
-    result = compose(input, mode === 'prod' ? { mode } : { mode, target });
+    result = compose(input, { mode, target, jobGroupOnly: groupOnly.getAttribute('aria-pressed') === 'true' });
     output.value = result.text;
     output.style.height = 'auto';
     output.style.height = `${output.scrollHeight + 2}px`;
@@ -56,10 +56,16 @@ export function mountTidal(root) {
     for (const [value, button] of targetButtons) button.setAttribute('aria-pressed', String(value === target));
   }
 
+  const groupOnly = el('button', { type: 'button', class: 'toggle small', 'aria-pressed': 'false' }, 'Job group only');
+  groupOnly.addEventListener('click', () => {
+    groupOnly.setAttribute('aria-pressed', String(groupOnly.getAttribute('aria-pressed') !== 'true'));
+    refresh();
+  });
+
   const categories = CATEGORIES.map(def => {
     const box = el('textarea', { rows: '5', wrap: 'off', placeholder: `${def.hint}\nOne per row`, 'aria-label': def.label });
     box.addEventListener('input', refresh);
-    const panel = el('section', { class: 'entries', hidden: '' }, el('h3', {}, def.label), box);
+    const panel = el('section', { class: 'entries', hidden: '' }, el('h3', {}, def.label), box, ...(def.id === 'jobs' ? [groupOnly] : []));
     const c = { def, box, panel, on: false };
     c.toggle = el('button', { type: 'button', class: 'toggle', 'aria-pressed': 'false' }, def.label);
     c.toggle.addEventListener('click', () => {
