@@ -6,8 +6,12 @@
 
 import { el } from './dom.js';
 
-const MODULES = ['dom.js', 'transport.js', 'tidal.js', 'download.js', 'app.js'];
+const MODULES = ['dom.js', 'version.js', 'transport.js', 'tidal.js', 'download.js', 'app.js'];
 const FILE_NAME = 'fixtools.html';
+/** Every file of the site, for a reload that refreshes them all in the browser's cache. */
+export const SITE_FILES = ['index.html', 'style.css', ...MODULES];
+/** Where the newest version lives: a downloaded copy checks it to tell when it's out of date. */
+export const LIVE_SITE = 'https://sown-dev.github.io/fixtools/';
 
 /** SHA-256 of text, base64. crypto.subtle only exists on https (and localhost / files), so on a plain-http
  * server the hash is worked out here instead. */
@@ -87,7 +91,7 @@ export async function buildStandalone() {
   const safeJs = js.replace(/<\/script/gi, '<\\/script');
   const safeCss = css.replace(/<\/style/gi, '<\\/style');
   // The same locked-down policy as the site, with the inline style and script allowed by their hashes.
-  const policy = `default-src 'none'; script-src 'sha256-${await sha256(safeJs)}'; style-src 'sha256-${await sha256(safeCss)}'; base-uri 'none'`;
+  const policy = `default-src 'none'; script-src 'sha256-${await sha256(safeJs)}'; style-src 'sha256-${await sha256(safeCss)}'; connect-src ${LIVE_SITE}version.js; base-uri 'none'`;
   return `<!doctype html>
 <html lang="en">
 <head>

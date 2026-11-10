@@ -77,6 +77,9 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 @keyframes expand-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .copy-buffer { position: fixed; left: -9999px; top: 0; opacity: 0; }
 .download { flex: none; }
+.version { flex: none; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.version.outdated { color: var(--bad); }
+.version .link, .version a { display: inline; padding: 0; font-size: 12px; color: var(--accent); }
 
 /* The change window: each date in full, its copy button beside it. */
 .when-row { display: flex; align-items: center; gap: 8px; padding: 8px 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
