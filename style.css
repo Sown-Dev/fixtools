@@ -80,17 +80,25 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 .date-input { width: 100%; font: inherit; font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--accent); border-radius: 6px; padding: 7px 9px; color-scheme: dark; text-transform: none; letter-spacing: 0; font-weight: 400; }
 .date-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
-/* A copy button: "✓ Copied" replaces its label at once, holds, then fades back. Nothing animates in. */
-.copy { position: relative; display: inline-grid; }
-.copy > span { grid-area: 1 / 1; transition: opacity .25s ease-in; }
-.copy-done { opacity: 0; font-weight: 600; }
-.copy { transition: background-color .3s ease-in, border-color .3s ease-in, color .3s ease-in; }
+/* A copy button. Everything starts on the first frame: a dip while pressed, then a short pop in the result's
+   colour, a ripple from the click and "✓ Copied" snapping in. It holds, then eases back. */
+.copy { position: relative; overflow: hidden; display: inline-grid; isolation: isolate;
+  transition: background-color .35s ease-in, border-color .35s ease-in, color .35s ease-in, transform .08s ease-out; }
+.copy:active:not(:disabled) { transform: scale(.96); transition-duration: .35s, .35s, .35s, .04s; }
+.copy > span { grid-area: 1 / 1; transition: opacity .25s ease-in, transform .25s ease-in; }
+.copy-done { opacity: 0; transform: translateY(6px); font-weight: 600; }
 .copy.copied, .copy.failed, .copy.copied > span, .copy.failed > span { transition: none; }
-.copy.copied { background: rgba(111, 207, 143, .16); border-color: var(--ok); color: var(--ok); }
-.copy.failed { background: rgba(255, 107, 94, .16); border-color: var(--bad); color: var(--bad); }
-.copy.copied .copy-label, .copy.failed .copy-label { opacity: 0; }
-.copy.copied .copy-done, .copy.failed .copy-done { opacity: 1; }
+.copy.copied { background: rgba(111, 207, 143, .18); border-color: var(--ok); color: var(--ok); animation: copy-pop .22s cubic-bezier(.2, 1.6, .4, 1); }
+.copy.failed { background: rgba(255, 107, 94, .18); border-color: var(--bad); color: var(--bad); animation: copy-shake .28s ease-out; }
+.copy.copied .copy-label, .copy.failed .copy-label { opacity: 0; transform: translateY(-6px); }
+.copy.copied .copy-done, .copy.failed .copy-done { opacity: 1; transform: none; animation: copy-in .14s ease-out; }
 .btn.primary.copy.copied { background: var(--ok); border-color: var(--ok); color: var(--accent-ink); }
+.copy-ripple { position: absolute; z-index: -1; border-radius: 50%; background: currentColor; opacity: 0; pointer-events: none; animation: copy-ripple .45s ease-out; }
+.btn.primary.copy .copy-ripple { background: #fff; }
+@keyframes copy-pop { 0% { transform: scale(.95); } 45% { transform: scale(1.045); } 100% { transform: scale(1); } }
+@keyframes copy-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-3px); } 60% { transform: translateX(3px); } }
+@keyframes copy-in { from { opacity: .3; transform: translateY(5px) scale(.9); } to { opacity: 1; transform: none; } }
+@keyframes copy-ripple { from { transform: scale(0); opacity: .32; } to { transform: scale(1); opacity: 0; } }
 
 @media (max-width: 680px) {
   .output-row { flex-direction: column; align-items: stretch; }
@@ -98,5 +106,6 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
   .mode { font-size: 14px; padding: 12px 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .copy, .copy * { transition: none !important; }
+  .copy, .copy * { transition: none !important; animation: none !important; }
+  .copy-ripple { display: none; }
 }

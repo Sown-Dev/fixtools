@@ -28,18 +28,36 @@ async function copyText(value) {
 }
 
 /**
- * A button that copies text(). It says so the instant it's clicked (no animation in), holds a moment, then
- * eases back.
+ * A button that copies text(). Its feedback starts on the very first frame: it dips while pressed, then pops
+ * in the result's colour with a ripple from where it was clicked and "✓ Copied" snapping in; it holds a
+ * moment, then eases back.
  */
 function copyButton(label, text, extraClass = '') {
   const done = el('span', { class: 'copy-done', 'aria-live': 'polite' });
   const button = el('button', { type: 'button', class: `btn copy ${extraClass}` }, el('span', { class: 'copy-label' }, label), done);
   let timer;
+  let at = null;
+  button.addEventListener('pointerdown', e => {
+    const box = button.getBoundingClientRect();
+    at = { x: e.clientX - box.left, y: e.clientY - box.top };
+  });
   button.addEventListener('click', async () => {
     const copied = await copyText(text());
     button.classList.remove('copied', 'failed');
+    void button.offsetWidth; // restarts the pop on a quick second click
     button.classList.add(copied ? 'copied' : 'failed');
     done.textContent = copied ? '✓ Copied' : 'Failed';
+    // The ripple: from the pointer, or the middle for a keyboard press, big enough to reach every corner.
+    const box = button.getBoundingClientRect();
+    const from = at || { x: box.width / 2, y: box.height / 2 };
+    at = null;
+    const size = 2 * Math.hypot(Math.max(from.x, box.width - from.x), Math.max(from.y, box.height - from.y));
+    const ripple = el('span', { class: 'copy-ripple', 'aria-hidden': 'true' });
+    ripple.style.left = `${from.x - size / 2}px`;
+    ripple.style.top = `${from.y - size / 2}px`;
+    ripple.style.width = ripple.style.height = `${size}px`;
+    button.append(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove());
     clearTimeout(timer);
     timer = setTimeout(() => button.classList.remove('copied', 'failed'), 1100);
   });
