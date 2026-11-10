@@ -17,7 +17,7 @@ export const LIVE_SITE = 'https://sown-dev.github.io/fixtools/';
  * server the hash is worked out here instead. */
 async function sha256(text) {
   const bytes = new TextEncoder().encode(text);
-  const digest = globalThis.crypto && crypto.subtle && window.isSecureContext
+  const digest = globalThis.crypto && crypto.subtle && globalThis.isSecureContext !== false
     ? new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
     : sha256Bytes(bytes);
   let binary = '';
