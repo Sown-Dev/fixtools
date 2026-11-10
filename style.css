@@ -57,30 +57,40 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 .output-box { flex: 1; min-width: 0; }
 .output-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .output { min-height: 150px; }
-.prod-buttons { width: 200px; flex: none; display: flex; flex-direction: column; gap: 7px; padding-top: 38px; }
-.prod-buttons .btn { width: 100%; white-space: normal; }
+.prod-buttons { width: 270px; flex: none; display: flex; flex-direction: column; gap: 12px; padding-top: 38px; }
+.copy-list, .when { display: flex; flex-direction: column; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.copy-list h3, .when h3 { margin: 0 0 2px; }
+.copy-list .btn { width: 100%; text-align: left; justify-items: start; }
 .copy-buffer { position: fixed; left: -9999px; top: 0; opacity: 0; }
 .download { flex: none; }
-.date-override { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: .85em; }
-.date-row { display: flex; gap: 4px; }
-.date-input { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; color-scheme: dark; }
-.date-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-.date-clear { padding: 2px 9px; }
-.copy-value { display: block; font-size: .8em; opacity: .7; }
 
-/* A copy button: its label fades out and the result pops in over it, in the same space. */
-.copy { position: relative; overflow: hidden; display: inline-grid; place-items: center; }
-.copy > span { grid-area: 1 / 1; transition: opacity .15s, transform .15s; }
-.copy-done { opacity: 0; transform: translateY(8px) scale(.9); font-weight: 600; }
-.copy::before { content: ""; position: absolute; inset: 0; background: var(--ok); transform: scaleX(0); transform-origin: left; opacity: 0; }
-.copy > span { position: relative; }
-.copy.copied, .copy.failed { color: var(--accent-ink); border-color: var(--ok); }
-.copy.failed { border-color: var(--bad); }
-.copy.copied::before, .copy.failed::before { opacity: 1; transform: scaleX(1); transition: transform .22s ease-out; }
-.copy.failed::before { background: var(--bad); }
-.copy.copied .copy-label, .copy.failed .copy-label { opacity: 0; transform: translateY(-8px); }
-.copy.copied .copy-done, .copy.failed .copy-done { opacity: 1; transform: none; animation: copy-pop .3s ease-out; }
-@keyframes copy-pop { 50% { transform: scale(1.12); } }
+/* The change window: each date in full, its copy button beside it. */
+.when-row { display: flex; align-items: center; gap: 8px; padding: 8px 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.when-row.is-custom { border-color: var(--accent); }
+.when-text { flex: 1; min-width: 0; }
+.when-label { display: block; font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.when-value { font-family: Consolas, "Cascadia Mono", monospace; font-size: 15px; margin: 1px 0; }
+.when-note { font-size: 11.5px; color: var(--muted); }
+.when-row.is-custom .when-note { color: var(--accent); }
+.btn.small { padding: 5px 10px; font-size: 12.5px; }
+.link { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--accent); cursor: pointer; font-size: 12.5px; }
+.link:hover { text-decoration: underline; }
+.picker-box { display: flex; flex-direction: column; gap: 6px; }
+.picker-box .when-label { display: flex; flex-direction: column; gap: 4px; }
+.date-input { width: 100%; font: inherit; font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--accent); border-radius: 6px; padding: 7px 9px; color-scheme: dark; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.date-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* A copy button: "✓ Copied" replaces its label at once, holds, then fades back. Nothing animates in. */
+.copy { position: relative; display: inline-grid; }
+.copy > span { grid-area: 1 / 1; transition: opacity .25s ease-in; }
+.copy-done { opacity: 0; font-weight: 600; }
+.copy { transition: background-color .3s ease-in, border-color .3s ease-in, color .3s ease-in; }
+.copy.copied, .copy.failed, .copy.copied > span, .copy.failed > span { transition: none; }
+.copy.copied { background: rgba(111, 207, 143, .16); border-color: var(--ok); color: var(--ok); }
+.copy.failed { background: rgba(255, 107, 94, .16); border-color: var(--bad); color: var(--bad); }
+.copy.copied .copy-label, .copy.failed .copy-label { opacity: 0; }
+.copy.copied .copy-done, .copy.failed .copy-done { opacity: 1; }
+.btn.primary.copy.copied { background: var(--ok); border-color: var(--ok); color: var(--accent-ink); }
 
 @media (max-width: 680px) {
   .output-row { flex-direction: column; align-items: stretch; }
@@ -88,5 +98,5 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
   .mode { font-size: 14px; padding: 12px 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .copy *, .copy::before { transition: none !important; animation: none !important; }
+  .copy, .copy * { transition: none !important; }
 }

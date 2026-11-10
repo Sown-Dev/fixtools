@@ -1,7 +1,7 @@
 // Tidal Transport Composer page. Every box is made once and only shown or hidden, so typing never loses
 // focus and a category keeps its text while it's toggled off.
 
-import { CATEGORIES, TARGETS, PROD_TEXTS, compose, changeWindow, formatDate } from './transport.js';
+import { CATEGORIES, TARGETS, PROD_TEXTS, WINDOW_HOURS, compose, changeWindow, formatDate } from './transport.js';
 import { el } from './dom.js';
 
 /**
@@ -27,7 +27,10 @@ async function copyText(value) {
   return copied;
 }
 
-/** A button that copies text() and animates to say whether it worked. */
+/**
+ * A button that copies text(). It says so the instant it's clicked (no animation in), holds a moment, then
+ * eases back.
+ */
 function copyButton(label, text, extraClass = '') {
   const done = el('span', { class: 'copy-done', 'aria-live': 'polite' });
   const button = el('button', { type: 'button', class: `btn copy ${extraClass}` }, el('span', { class: 'copy-label' }, label), done);
@@ -35,13 +38,65 @@ function copyButton(label, text, extraClass = '') {
   button.addEventListener('click', async () => {
     const copied = await copyText(text());
     button.classList.remove('copied', 'failed');
-    void button.offsetWidth; // restarts the animation on a quick second click
     button.classList.add(copied ? 'copied' : 'failed');
-    done.textContent = copied ? 'Copied ✓' : 'Failed';
+    done.textContent = copied ? '✓ Copied' : 'Failed';
     clearTimeout(timer);
-    timer = setTimeout(() => button.classList.remove('copied', 'failed'), 1400);
+    timer = setTimeout(() => button.classList.remove('copied', 'failed'), 1100);
   });
   return button;
+}
+
+const shortDate = d => d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+
+/**
+ * The change window: Start and End shown in full, each with its own copy button. The start is automatic (the
+ * next whole hour a day out) unless a date is picked; the end always follows it. Dates are worked out again
+ * on every copy, so they're right however long the page has been open.
+ */
+function changeWindowPanel() {
+  let custom = false;
+  const picker = el('input', { type: 'datetime-local', class: 'date-input', 'aria-label': 'Custom start' });
+  const current = () => changeWindow(new Date(), custom && picker.value ? new Date(picker.value) : null);
+
+  const row = (label, pick) => {
+    const value = el('div', { class: 'when-value' });
+    const note = el('div', { class: 'when-note' });
+    const copy = copyButton('Copy', () => formatDate(pick(current())), 'small');
+    const line = el('div', { class: 'when-row' }, el('div', { class: 'when-text' }, el('div', { class: 'when-label' }, label), value, note), copy);
+    return { line, value, note };
+  };
+  const start = row('Start date', w => w.start);
+  const end = row('End date', w => w.end);
+
+  const change = el('button', { type: 'button', class: 'link' }, 'Pick a different start…');
+  const reset = el('button', { type: 'button', class: 'link' }, 'Use automatic start');
+  const pickerBox = el('div', { class: 'picker-box', hidden: '' }, el('label', { class: 'when-label' }, 'Custom start', picker), reset);
+
+  const show = () => {
+    const w = current();
+    start.value.textContent = formatDate(w.start).slice(0, 16);
+    start.note.textContent = `${shortDate(w.start)} · ${custom ? "custom" : "next whole hour + 24 h"}`;
+    start.line.classList.toggle('is-custom', custom);
+    end.value.textContent = formatDate(w.end).slice(0, 16);
+    end.note.textContent = `${shortDate(w.end)} · ${WINDOW_HOURS} h after start`;
+  };
+  change.addEventListener('click', () => {
+    picker.value = formatDate(current().start).slice(0, 16).replace(' ', 'T');
+    pickerBox.hidden = false;
+    change.hidden = true;
+    picker.focus();
+    try { picker.showPicker(); } catch {}
+  });
+  picker.addEventListener('input', () => { custom = Boolean(picker.value); show(); });
+  reset.addEventListener('click', () => {
+    custom = false;
+    pickerBox.hidden = true;
+    change.hidden = false;
+    show();
+  });
+  show();
+  setInterval(show, 30 * 1000);
+  return el('section', { class: 'when' }, el('h3', {}, 'Change window'), start.line, end.line, change, pickerBox);
 }
 
 export function mountTidal(root) {
@@ -55,32 +110,9 @@ export function mountTidal(root) {
   const allConfigButton = copyButton('All Config Items', () => result.allConfigItems);
   const implementationButton = copyButton('Implementation', () => result.implementation);
   const textButtons = PROD_TEXTS.map(t => copyButton(t.label, () => t.text));
-  // Worked out when clicked, so they're right however long the page has been open; the label shows the value.
-  // A start picked in the calendar box overrides the automatic one; the end always follows the start.
-  const customStart = el('input', { type: 'datetime-local', class: 'date-input', 'aria-label': 'Custom start date' });
-  const clearStart = el('button', { type: 'button', class: 'btn date-clear', title: 'Back to the automatic start date', 'aria-label': 'Clear custom start date' }, '×');
-  // The box shows the automatic start and keeps up with it until a date is picked; × goes back to automatic.
-  let custom = false;
-  const window_ = () => changeWindow(new Date(), custom && customStart.value ? new Date(customStart.value) : null);
-  const startShown = el('small', { class: 'copy-value' });
-  const endShown = el('small', { class: 'copy-value' });
-  const startButton = copyButton(el('span', {}, 'Start Date', startShown), () => formatDate(window_().start));
-  const endButton = copyButton(el('span', {}, 'End Date', endShown), () => formatDate(window_().end));
-  const showDates = () => {
-    const w = window_();
-    if (!custom) customStart.value = formatDate(w.start).slice(0, 16).replace(' ', 'T');
-    startShown.textContent = formatDate(w.start).slice(0, 16) + (custom ? ' (custom)' : '');
-    endShown.textContent = formatDate(w.end).slice(0, 16);
-    clearStart.hidden = !custom;
-  };
-  customStart.addEventListener('input', () => { custom = Boolean(customStart.value); showDates(); });
-  clearStart.addEventListener('click', () => { custom = false; showDates(); });
-  const dateOverride = el('label', { class: 'date-override' },
-    el('span', { class: 'muted' }, 'Start date (pick to override)'),
-    el('span', { class: 'date-row' }, customStart, clearStart));
-  showDates();
-  setInterval(showDates, 30 * 1000);
-  const prodButtons = el('div', { class: 'prod-buttons', hidden: '' }, configButton, allConfigButton, implementationButton, ...textButtons, dateOverride, startButton, endButton);
+  const prodButtons = el('div', { class: 'prod-buttons', hidden: '' },
+    el('section', { class: 'copy-list' }, el('h3', {}, 'Copy for the change request'), configButton, allConfigButton, implementationButton, ...textButtons),
+    changeWindowPanel());
 
   function refresh() {
     const input = {};
