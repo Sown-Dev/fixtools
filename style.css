@@ -59,6 +59,14 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 .output { min-height: 150px; }
 .prod-buttons { width: 200px; flex: none; display: flex; flex-direction: column; gap: 7px; padding-top: 38px; }
 .prod-buttons .btn { width: 100%; white-space: normal; }
+.copy-buffer { position: fixed; left: -9999px; top: 0; opacity: 0; }
+.download { flex: none; }
+.date-override { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: .85em; }
+.date-row { display: flex; gap: 4px; }
+.date-input { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; color-scheme: dark; }
+.date-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.date-clear { padding: 2px 9px; }
+.copy-value { display: block; font-size: .8em; opacity: .7; }
 
 /* A copy button: its label fades out and the result pops in over it, in the same space. */
 .copy { position: relative; overflow: hidden; display: inline-grid; place-items: center; }

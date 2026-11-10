@@ -4,7 +4,7 @@
 // The toggles, in the order they show.
 export const CATEGORIES = [
   { id: 'jobs', label: 'Jobs', type: 'JOB', hint: '\\Group\\Job name' },
-  { id: 'variables', label: 'Variables', type: 'Variables', hint: 'Variable name' },
+  { id: 'variables', label: 'Variables', type: 'Variable', hint: 'Variable name' },
   { id: 'events', label: 'Job events', type: 'Events > Job Events', hint: 'Job event name' },
   { id: 'emails', label: 'Email actions', type: 'Actions > E-mail', hint: 'Email action name' },
 ];
@@ -27,6 +27,33 @@ export const PROD_TEXTS = [
   { label: 'Backout Plan', text: 'The back-out plan is to revert changes to previous state.' },
   { label: 'Post Implementation', text: 'After notification that the change task was completed, our team will verify the integrity of any variables, runtime users, files, folders and/or jobs which were promoted.' },
 ];
+
+const HOUR = 60 * 60 * 1000;
+// How long a change window lasts: the end date is this long after the start.
+export const WINDOW_HOURS = 4;
+
+/**
+ * The change window for a change request made at now: by default it starts on the next whole hour (always
+ * up, so 13:00 exactly gives 14:00) a day later; customStart (a Date) replaces that. It ends WINDOW_HOURS
+ * after the start.
+ */
+export function changeWindow(now = new Date(), customStart = null) {
+  let startMs;
+  if (customStart && !Number.isNaN(customStart.getTime())) {
+    startMs = customStart.getTime();
+  } else {
+    const start = new Date(now);
+    start.setMinutes(0, 0, 0);
+    startMs = start.getTime() + HOUR + 24 * HOUR;
+  }
+  return { start: new Date(startMs), end: new Date(startMs + WINDOW_HOURS * HOUR) };
+}
+
+/** YYYY-MM-DD HH:mm:ss in local time, as ServiceNow's date fields take it. */
+export function formatDate(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
 
 /** The entries of one textbox: a row each, blank rows dropped. */
 export function rows(text) {

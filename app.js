@@ -2,6 +2,7 @@
 
 import { el } from './dom.js';
 import { mountTidal } from './tidal.js';
+import { downloadButton } from './download.js';
 
 const TOOLS = [
   { name: 'Tidal Transport Composer', mount: mountTidal },
@@ -16,3 +17,4 @@ for (const tool of TOOLS) {
   main.append(page);
   nav.append(el('span', { class: 'tab', 'aria-current': 'page' }, tool.name));
 }
+nav.after(downloadButton());
