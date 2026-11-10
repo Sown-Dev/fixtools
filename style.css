@@ -61,6 +61,20 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 .copy-list, .when { display: flex; flex-direction: column; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
 .copy-list h3, .when h3 { margin: 0 0 2px; }
 .copy-list .btn { width: 100%; text-align: left; justify-items: start; }
+/* All Config Items opens a list instead of copying. */
+.expand-box { display: flex; flex-direction: column; }
+.btn.expand { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; }
+.expand-label { flex: 1; }
+.expand-count { font-size: 11.5px; padding: 0 6px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.chevron { width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .12s ease-out; }
+.btn.expand[aria-expanded=true] { border-color: var(--accent); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.btn.expand[aria-expanded=true] .chevron { transform: translateY(2px) rotate(-135deg); }
+.expand-list { display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--bg); border: 1px solid var(--accent); border-top: 0; border-radius: 0 0 6px 6px; max-height: 260px; overflow-y: auto; animation: expand-in .12s ease-out; }
+.expand-row { display: flex; align-items: center; gap: 6px; padding: 3px 3px 3px 6px; border-radius: 4px; }
+.expand-row:hover { background: var(--panel); }
+.expand-name { flex: 1; min-width: 0; font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.copy-list .expand-row .btn { width: auto; flex: none; }
+@keyframes expand-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .copy-buffer { position: fixed; left: -9999px; top: 0; opacity: 0; }
 .download { flex: none; }
 
@@ -108,4 +122,5 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 @media (prefers-reduced-motion: reduce) {
   .copy, .copy * { transition: none !important; animation: none !important; }
   .copy-ripple { display: none; }
+  .expand-list, .chevron { animation: none !important; transition: none !important; }
 }

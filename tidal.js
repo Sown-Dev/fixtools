@@ -1,7 +1,7 @@
 // Tidal Transport Composer page. Every box is made once and only shown or hidden, so typing never loses
 // focus and a category keeps its text while it's toggled off.
 
-import { CATEGORIES, TARGETS, PROD_TEXTS, WINDOW_HOURS, compose, changeWindow, formatDate } from './transport.js';
+import { CATEGORIES, TARGETS, PROD_TEXTS, compose, changeWindow, formatDate } from './transport.js';
 import { el } from './dom.js';
 
 /**
@@ -93,10 +93,10 @@ function changeWindowPanel() {
   const show = () => {
     const w = current();
     start.value.textContent = formatDate(w.start).slice(0, 16);
-    start.note.textContent = `${shortDate(w.start)} · ${custom ? "custom" : "next whole hour + 24 h"}`;
+    start.note.textContent = shortDate(w.start);
     start.line.classList.toggle('is-custom', custom);
     end.value.textContent = formatDate(w.end).slice(0, 16);
-    end.note.textContent = `${shortDate(w.end)} · ${WINDOW_HOURS} h after start`;
+    end.note.textContent = shortDate(w.end);
   };
   change.addEventListener('click', () => {
     picker.value = formatDate(current().start).slice(0, 16).replace(' ', 'T');
@@ -117,6 +117,34 @@ function changeWindowPanel() {
   return el('section', { class: 'when' }, el('h3', {}, 'Change window'), start.line, end.line, change, pickerBox);
 }
 
+/**
+ * All Config Items: a button that opens a list of every config item, each with its own copy button, instead
+ * of copying them all at once.
+ */
+function allConfigList() {
+  const count = el('span', { class: 'expand-count' });
+  const toggle = el('button', { type: 'button', class: 'btn expand', 'aria-expanded': 'false' },
+    el('span', { class: 'expand-label' }, 'All Config Items'), count, el('span', { class: 'chevron', 'aria-hidden': 'true' }));
+  const list = el('div', { class: 'expand-list', hidden: '' });
+  let shown = '';
+  toggle.addEventListener('click', () => {
+    const open = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', String(open));
+    list.hidden = !open;
+  });
+  const show = items => {
+    toggle.disabled = !items.length;
+    count.textContent = items.length ? String(items.length) : '';
+    if (!items.length) { toggle.setAttribute('aria-expanded', 'false'); list.hidden = true; }
+    const key = items.join('\n');
+    if (key === shown) return; // rebuilt only when the items change, so a copy animation isn't cut off
+    shown = key;
+    list.replaceChildren(...items.map(name => el('div', { class: 'expand-row' },
+      el('span', { class: 'expand-name', title: name }, name), copyButton('Copy', () => name, 'small'))));
+  };
+  return { box: el('div', { class: 'expand-box' }, toggle, list), show };
+}
+
 export function mountTidal(root) {
   let mode = 'int';
   let target = TARGETS[0];
@@ -125,11 +153,11 @@ export function mountTidal(root) {
   const output = el('textarea', { class: 'output', readonly: '', rows: '8', placeholder: 'Turn on a category and add entries.', 'aria-label': 'Transport instructions' });
   const copyOutput = copyButton('Copy to clipboard', () => output.value, 'primary');
   const configButton = copyButton('Config Item', () => result.configItem);
-  const allConfigButton = copyButton('All Config Items', () => result.allConfigItems);
+  const allConfig = allConfigList();
   const implementationButton = copyButton('Implementation', () => result.implementation);
   const textButtons = PROD_TEXTS.map(t => copyButton(t.label, () => t.text));
   const prodButtons = el('div', { class: 'prod-buttons', hidden: '' },
-    el('section', { class: 'copy-list' }, el('h3', {}, 'Copy for the change request'), configButton, allConfigButton, implementationButton, ...textButtons),
+    el('section', { class: 'copy-list' }, el('h3', {}, 'Copy for the change request'), configButton, allConfig.box, implementationButton, ...textButtons),
     changeWindowPanel());
 
   function refresh() {
@@ -141,7 +169,7 @@ export function mountTidal(root) {
     output.style.height = `${output.scrollHeight + 2}px`;
     copyOutput.disabled = !result.text;
     configButton.disabled = !result.configItem;
-    allConfigButton.disabled = !result.allConfigItems;
+    allConfig.show(result.allConfigItems ? result.allConfigItems.split('\n') : []);
     implementationButton.disabled = !result.implementation;
     prodButtons.hidden = mode !== 'prod';
     targetRow.hidden = mode === 'prod';
