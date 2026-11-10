@@ -1,7 +1,7 @@
 // Tidal Transport Composer page. Every box is made once and only shown or hidden, so typing never loses
 // focus and a category keeps its text while it's toggled off.
 
-import { CATEGORIES, TARGETS, PROD_TEXTS, compose, changeWindow, formatDate } from './transport.js';
+import { CATEGORIES, TARGETS, PROD_TEXTS, compose, changeWindow, formatDate, parseDate } from './transport.js';
 import { el } from './dom.js';
 
 /**
@@ -86,9 +86,25 @@ function changeWindowPanel() {
   const start = row('Start date', w => w.start);
   const end = row('End date', w => w.end);
 
-  const change = el('button', { type: 'button', class: 'link' }, 'Pick a different start…');
+  const change = el('button', { type: 'button', class: 'link' }, 'Pick or paste a different start…');
   const reset = el('button', { type: 'button', class: 'link' }, 'Use automatic start');
-  const pickerBox = el('div', { class: 'picker-box', hidden: '' }, el('label', { class: 'when-label' }, 'Custom start', picker), reset);
+  // A pasted date, in whatever format it came in; a date without a time keeps the automatic start's time.
+  const pasted = el('input', { type: 'text', class: 'date-input paste-input', placeholder: 'e.g. 11/12/2026 5:00 PM', spellcheck: 'false', autocomplete: 'off' });
+  const pasteNote = el('div', { class: 'paste-note' });
+  const readPasted = () => {
+    const text = pasted.value.trim();
+    const date = text ? parseDate(text, changeWindow(new Date()).start) : null;
+    pasted.classList.toggle('bad', Boolean(text) && !date);
+    pasteNote.textContent = text && !date ? "Can't read that date" : '';
+    if (!date) return;
+    picker.value = formatDate(date).slice(0, 16).replace(' ', 'T');
+    custom = true;
+    show();
+  };
+  pasted.addEventListener('input', readPasted);
+  const pickerBox = el('div', { class: 'picker-box', hidden: '' },
+    el('label', { class: 'when-label' }, 'Custom start', picker),
+    el('label', { class: 'when-label' }, 'Or paste a date', pasted), pasteNote, reset);
 
   const show = () => {
     const w = current();
@@ -105,9 +121,16 @@ function changeWindowPanel() {
     picker.focus();
     try { picker.showPicker(); } catch {}
   });
-  picker.addEventListener('input', () => { custom = Boolean(picker.value); show(); });
+  picker.addEventListener('input', () => {
+    custom = Boolean(picker.value);
+    pasted.value = '';
+    readPasted();
+    show();
+  });
   reset.addEventListener('click', () => {
     custom = false;
+    pasted.value = '';
+    readPasted();
     pickerBox.hidden = true;
     change.hidden = false;
     show();

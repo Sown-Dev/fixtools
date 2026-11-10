@@ -55,6 +55,54 @@ export function formatDate(d) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/**
+ * Reads a pasted date and time, local time: 2026-11-11 17:00(:00), 2026/11/11, 11/11/2026 5:00 PM (US order,
+ * month first), 11.11.2026 17:00 (day first), Nov 11 2026 5pm, 11 Nov 2026 17:00, an ISO time. A date without a
+ * time takes timeOfDay's hours and minutes (or midnight). Returns a Date, or null if it can't be read.
+ */
+export function parseDate(text, timeOfDay = null) {
+  let s = String(text || '').trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ');
+  if (!s) return null;
+  if (/^\d{4}-\d\d-\d\dt\d/.test(s) && /(z|[+-]\d\d:?\d\d)$/.test(s)) {
+    const d = new Date(s.toUpperCase());
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  s = s.replace(/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.? /, '');
+  // The time: the first h:mm(:ss), or a bare hour with am/pm.
+  let hour = null, minute = 0, second = 0;
+  const time = s.match(/(?:^|[ t])(\d{1,2}):(\d\d)(?::(\d\d))?(?:\.\d+)? ?(am|pm)?/) || s.match(/(?:^| )(\d{1,2}) ?(am|pm)/);
+  if (time) {
+    hour = Number(time[1]);
+    const colon = time[0].includes(':');
+    if (colon) { minute = Number(time[2]); second = Number(time[3] || 0); }
+    const half = colon ? time[4] : time[2];
+    if (half) {
+      if (hour < 1 || hour > 12) return null;
+      hour = (hour % 12) + (half === 'pm' ? 12 : 0);
+    }
+    s = s.replace(time[0], ' ').trim();
+  }
+  // The date.
+  let y, m, d, k;
+  if ((k = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/))) [y, m, d] = [k[1], k[2], k[3]];
+  else if ((k = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/))) [m, d, y] = [k[1], k[2], k[3]];
+  else if ((k = s.match(/^(\d{1,2})[.-](\d{1,2})[.-](\d{2,4})$/))) [d, m, y] = [k[1], k[2], k[3]];
+  else if ((k = s.match(/^([a-z]{3})[a-z]*\.? (\d{1,2})(?:st|nd|rd|th)? (\d{4})$/))) [m, d, y] = [MONTHS.indexOf(k[1]) + 1, k[2], k[3]];
+  else if ((k = s.match(/^(\d{1,2})(?:st|nd|rd|th)? ([a-z]{3})[a-z]*\.? (\d{4})$/))) [d, m, y] = [k[1], MONTHS.indexOf(k[2]) + 1, k[3]];
+  else return null;
+  [y, m, d] = [Number(y), Number(m), Number(d)];
+  if (y < 100) y += 2000;
+  if (hour === null) {
+    hour = timeOfDay ? timeOfDay.getHours() : 0;
+    minute = timeOfDay ? timeOfDay.getMinutes() : 0;
+  }
+  if (m < 1 || m > 12 || d < 1 || d > 31 || hour > 23 || minute > 59 || second > 59) return null;
+  const out = new Date(y, m - 1, d, hour, minute, second);
+  return out.getDate() === d ? out : null; // 31 Nov and the like
+}
+
 /** The entries of one textbox: a row each, blank rows dropped. */
 export function rows(text) {
   return String(text || '').split(/\r?\n/).map(r => r.trim()).filter(Boolean);

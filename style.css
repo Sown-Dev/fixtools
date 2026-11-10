@@ -92,6 +92,11 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 .picker-box { display: flex; flex-direction: column; gap: 6px; }
 .picker-box .when-label { display: flex; flex-direction: column; gap: 4px; }
 .date-input { width: 100%; font: inherit; font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--accent); border-radius: 6px; padding: 7px 9px; color-scheme: dark; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.paste-input { border-color: var(--line); font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; }
+.paste-input::placeholder { color: var(--muted); opacity: .7; }
+.paste-input.bad { border-color: var(--bad); }
+.paste-note { font-size: 11.5px; color: var(--bad); margin-top: -2px; }
+.paste-note:empty { display: none; }
 .date-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 /* A copy button. Everything starts on the first frame: a dip while pressed, then a short pop in the result's
