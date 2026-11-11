@@ -1,7 +1,7 @@
 // Tidal Transport Composer page. Every box is made once and only shown or hidden, so typing never loses
 // focus and a category keeps its text while it's toggled off.
 
-import { CATEGORIES, TARGETS, PROD_TEXTS, compose, changeWindow, formatDate, parseDate } from './transport.js';
+import { CATEGORIES, TARGETS, PROD_TEXTS, compose, changeWindow, formatDate, parseDate, parseTransport, rows } from './transport.js';
 import { el } from './dom.js';
 
 /**
@@ -235,9 +235,51 @@ export function mountTidal(root) {
   }));
   const targetRow = el('div', { class: 'row target' }, el('span', { class: 'muted' }, 'Target environment'), ...targetButtons.values());
 
+  // The reverse: paste a transport and the toggles, boxes, mode and target are set as if it was made here.
+  const reverseToggle = el('button', { type: 'button', class: 'toggle reverse-toggle', 'aria-pressed': 'false' }, 'Fill from a transport…');
+  const pasteBox = el('textarea', { rows: '6', wrap: 'off', spellcheck: 'false', 'aria-label': 'Paste a transport',
+    placeholder: 'Paste an Int/UAT transport or a PROD change request\nTrans 1A: FROMENV=DEV TOENV=UAT Type=JOB Name=\\Group\\Job name' });
+  const reverseNote = el('div', { class: 'reverse-note', 'aria-live': 'polite' });
+  const reversePanel = el('section', { class: 'reverse', hidden: '' },
+    el('div', { class: 'output-head' }, el('h3', {}, 'Paste a transport to fill the form'), reverseNote), pasteBox);
+  const plural = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
+  const fill = () => {
+    const text = pasteBox.value.trim();
+    reverseNote.className = 'reverse-note';
+    if (!text) { reverseNote.textContent = ''; return; }
+    const read = parseTransport(text);
+    if (!read || !read.count) {
+      reverseNote.textContent = read ? `No known types (${plural(read.skipped, 'line')} skipped)` : 'No transport lines found';
+      reverseNote.classList.add('bad');
+      return;
+    }
+    for (const c of categories) {
+      c.on = c.def.id in read.input;
+      c.box.value = read.input[c.def.id] || '';
+      c.toggle.setAttribute('aria-pressed', String(c.on));
+      c.panel.hidden = !c.on;
+    }
+    groupOnly.setAttribute('aria-pressed', String(read.jobGroupOnly));
+    mode = read.mode;
+    if (read.target) target = read.target;
+    refresh();
+    const kinds = CATEGORIES.filter(c => read.input[c.id]).map(c => plural(rows(read.input[c.id]).length, c.label.toLowerCase().replace(/s$/, '')));
+    const where = read.mode === 'prod' ? 'PROD change request' : `${target} transport`;
+    reverseNote.textContent = `Filled ${kinds.join(', ')} · ${where}${read.skipped ? ` · ${plural(read.skipped, 'unknown line')} skipped` : ''}`;
+    reverseNote.classList.add('ok');
+  };
+  pasteBox.addEventListener('input', fill);
+  reverseToggle.addEventListener('click', () => {
+    const open = reverseToggle.getAttribute('aria-pressed') !== 'true';
+    reverseToggle.setAttribute('aria-pressed', String(open));
+    reversePanel.hidden = !open;
+    if (open) { pasteBox.focus(); pasteBox.select(); }
+  });
+
   root.append(
     el('h2', {}, 'Tidal Transport Composer'),
-    el('div', { class: 'row' }, ...categories.map(c => c.toggle)),
+    el('div', { class: 'row' }, ...categories.map(c => c.toggle), reverseToggle),
+    reversePanel,
     el('div', { class: 'entry-grid' }, ...categories.map(c => c.panel)),
     el('div', { class: 'modes' }, ...modeButtons.values()),
     targetRow,

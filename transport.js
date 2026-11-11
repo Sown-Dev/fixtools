@@ -152,6 +152,47 @@ export function allConfigItems(jobsText) {
   return [...new Set(jobGroups(jobsText).map(groupName))];
 }
 
+const GROUP_ONLY = /\s*\[job group only\]$/i;
+const typeKey = t => t.toLowerCase().replace(/\s+/g, '').replace('email', 'e-mail');
+
+/**
+ * The reverse of compose: reads pasted transport text (an Int/UAT transport or a whole PROD change request, as
+ * this tool writes it or copied back from a ticket) and gives what would make it again: { input (text by
+ * category id, only those present), mode, target (null for prod or an environment this tool doesn't offer),
+ * jobGroupOnly, count, skipped (lines with a Type this tool doesn't know) }, or null if it has no transport
+ * lines. A PROD request lists everything twice (PRD and BCP): each entry is kept once, in its first order.
+ */
+export function parseTransport(text) {
+  const byType = new Map(CATEGORIES.map(c => [typeKey(c.type), c.id]));
+  const found = Object.fromEntries(CATEGORIES.map(c => [c.id, []]));
+  const seen = new Set();
+  const toEnvs = new Set();
+  let count = 0, skipped = 0;
+  // A line each; lines run together on paste are split again at each "Trans 1A:".
+  for (const part of String(text || '').split(/\r?\n|(?=\bTrans\s+\d+[a-z]*\s*:)/i)) {
+    const m = part.match(/Type\s*=\s*(.+?)\s+Name\s*=\s*(.+)$/i);
+    if (!m) continue;
+    const to = part.match(/TOENV\s*=\s*(\S+)/i);
+    if (to) toEnvs.add(to[1].toUpperCase());
+    const id = byType.get(typeKey(m[1]));
+    if (!id) { skipped++; continue; }
+    const name = m[2].trim();
+    if (!name || seen.has(`${id}\n${name}`)) continue;
+    seen.add(`${id}\n${name}`);
+    found[id].push(name);
+    count++;
+  }
+  if (!count) return skipped ? { input: {}, mode: null, target: null, jobGroupOnly: false, count, skipped } : null;
+  // Job group only is one switch for every job: used when all of them carry the mark, else the names keep it.
+  const jobGroupOnly = found.jobs.length > 0 && found.jobs.every(j => GROUP_ONLY.test(j));
+  if (jobGroupOnly) found.jobs = found.jobs.map(j => j.replace(GROUP_ONLY, ''));
+  const input = {};
+  for (const [id, names] of Object.entries(found)) if (names.length) input[id] = names.join('\n');
+  const prod = toEnvs.has('PRD') || toEnvs.has('BCP');
+  const target = prod ? null : TARGETS.find(t => toEnvs.has(t)) || null;
+  return { input, mode: prod ? 'prod' : 'int', target, jobGroupOnly, count, skipped };
+}
+
 /**
  * input: textbox text by category id, only for the toggled-on ones.
  * options: { mode: 'int', target: 'INT' | 'UAT' } or { mode: 'prod' }, and jobGroupOnly to mark every job.
