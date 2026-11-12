@@ -2,12 +2,12 @@
 // column comes from (and how to change it), check the first rows, export. Everything runs in the browser
 // (reformat-engine.js): files never leave the page.
 //
-// Used by the hub (its Reformat tab, logged in or not) and by FixTools (G:\FixTools), whose download joins its
-// modules into one script: so this module has one top-level name, mountReformatTool, and brings its own helpers.
+// FixTools' download joins its modules into one script: so this module has one top-level name,
+// mountReformatTool, and brings its own helpers.
 //
-// Saved mappings live wherever options.storage keeps them (the hub's server when logged in; this browser
-// otherwise). Any mapping can be downloaded as a file and loaded back, and all saved ones backed up in one file,
-// in the same format as the desktop window's (apps/reformat/reformat_gui.py).
+// Saved mappings live wherever options.storage keeps them (this browser by default). Any mapping can be
+// downloaded as a file and loaded back, and all saved ones backed up in one file, in the same format as the
+// desktop window's (reformat-python/reformat_gui.py).
 
 import { ReformatEngine } from './reformat-engine.js';
 
