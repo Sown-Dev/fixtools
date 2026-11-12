@@ -1,10 +1,9 @@
 // The user list reformatter's engine, all in the browser: reads .xlsx, .xls and .csv / .txt files, finds their
 // column names, maps a raw list's columns onto a template's with changes ("steps"), and writes .xlsx or .csv.
-// No libraries and no server: files never leave the page. A port of apps/reformat/reformat.py (the desktop
-// window and command line), checked against it by apps/reformat/test_engine.mjs; keep the two in step.
+// No libraries and no server: files never leave the page. A port of reformat-python/reformat.py (the desktop
+// window and command line), checked against it by reformat-python/test_engine.mjs; keep the two in step.
 //
-// The same file is used by the hub (public/reformat-ui.js) and by FixTools (G:\FixTools), whose download joins
-// its modules into one script: so this module has one top-level name, ReformatEngine.
+// The site's download joins its modules into one script: so this module has one top-level name, ReformatEngine.
 
 export const ReformatEngine = (() => {
   const MAX_SCAN = 30; // rows looked at to find the header

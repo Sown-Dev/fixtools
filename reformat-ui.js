@@ -2,7 +2,7 @@
 // column comes from (and how to change it), check the first rows, export. Everything runs in the browser
 // (reformat-engine.js): files never leave the page.
 //
-// FixTools' download joins its modules into one script: so this module has one top-level name,
+// The site's download joins its modules into one script: so this module has one top-level name,
 // mountReformatTool, and brings its own helpers.
 //
 // Saved mappings live wherever options.storage keeps them (this browser by default). Any mapping can be

@@ -4,7 +4,7 @@ Turns a vendor's raw user list into the audit template's format: load the raw li
 
 Two versions that do the same thing, checked against each other (`node test_engine.mjs`):
 
-- **In a browser, with nothing to install** (`reformat-engine.js` and `reformat-ui.js` one folder up, no libraries): FixTools' Reformat page; its Download button makes one HTML file that works offline on any computer. Files are read and written in the browser and never uploaded. Saved mappings are kept in the browser. **Download mapping** saves one as a file, **Back up all** saves every one in one file, and **Load mapping file…** takes either back (in case the browser's are wiped, or to move them to another computer).
+- **In a browser, with nothing to install** (`reformat-engine.js` and `reformat-ui.js` one folder up, no libraries): MishTools' Reformat page; its Download button makes one HTML file that works offline on any computer. Files are read and written in the browser and never uploaded. Saved mappings are kept in the browser. **Download mapping** saves one as a file, **Back up all** saves every one in one file, and **Load mapping file…** takes either back (in case the browser's are wiped, or to move them to another computer).
 - **Python** (`reformat.py`), for a PC with Python 3.8:
   - the desktop window: `python reformat_gui.py`. Its mapping files are the same format as the browser's;
   - the command line:

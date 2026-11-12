@@ -1,5 +1,5 @@
 """
-User list reformatter, desktop window (tkinter, Python 3.8+): the same steps as FixTools' Reformat page, with
+User list reformatter, desktop window (tkinter, Python 3.8+): the same steps as MishTools' Reformat page, with
 the same engine (reformat.py), for a PC without a browser that can open it.
 
     python reformat_gui.py

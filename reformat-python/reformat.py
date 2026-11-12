@@ -3,7 +3,7 @@ User list reformatter: reads a vendor's raw user list and a template (just the c
 raw columns onto the template's with optional changes (first word, regex, ...), and writes a third file
 in the template's format. Python 3.8+, needs openpyxl (.xlsx) and xlrd (.xls; optional).
 
-The browser version (FixTools' reformat-engine.js, one folder up) is a port of this file;
+The browser version (MishTools' reformat-engine.js, one folder up) is a port of this file;
 test_engine.mjs checks the two agree, so change both together. This one is used:
   - by the desktop window, reformat_gui.py (tkinter);
   - as JSON on stdin (what a web page used before files were read in the browser):

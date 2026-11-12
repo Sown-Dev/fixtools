@@ -7,11 +7,11 @@
 import { el } from './dom.js';
 
 const MODULES = ['dom.js', 'version.js', 'transport.js', 'tidal.js', 'reformat-engine.js', 'reformat-ui.js', 'download.js', 'app.js'];
-const FILE_NAME = 'fixtools.html';
+const FILE_NAME = 'mishtools.html';
 /** Every file of the site, for a reload that refreshes them all in the browser's cache. */
 export const SITE_FILES = ['index.html', 'style.css', ...MODULES];
 /** Where the newest version lives: a downloaded copy checks it to tell when it's out of date. */
-export const LIVE_SITE = 'https://sown-dev.github.io/fixtools/';
+export const LIVE_SITE = 'https://sown-dev.github.io/mishtools/';
 
 /** SHA-256 of text, base64. crypto.subtle only exists on https (and localhost / files), so on a plain-http
  * server the hash is worked out here instead. */
@@ -100,12 +100,12 @@ export async function buildStandalone() {
 <meta name="robots" content="noindex, nofollow">
 <meta http-equiv="Content-Security-Policy" content="${policy}">
 <meta name="referrer" content="no-referrer">
-<title>FixTools Revived</title>
+<title>MishTools</title>
 <style id="bundle-css">${safeCss}</style>
 </head>
 <body>
 <header class="top">
-  <h1>FixTools Revived</h1>
+  <h1>MishTools</h1>
   <nav id="tools" aria-label="Tools"></nav>
 </header>
 <main id="tool"></main>
