@@ -97,7 +97,21 @@ export function mountReformatTool(root, options = {}) {
 
   function fullMapping() {
     const side = key => ({ sheet: files[key]?.sheet || null, header: files[key]?.header || 'auto' });
-    return { ...mapping, raw: side('raw'), template: side('template'), ...(typedNames ? { templateColumns: typedNames } : {}) };
+    const rows = rowSettings();
+    const { rows: _, ...rest } = mapping;
+    return { ...rest, raw: side('raw'), template: side('template'), ...(rows ? { rows } : {}), ...(typedNames ? { templateColumns: typedNames } : {}) };
+  }
+
+  /** The raw list's row settings that are switched on (filters, duplicates, grouping, sorting), or null. */
+  function rowSettings() {
+    const r = mapping.rows || {};
+    const out = {};
+    const filters = (r.filters || []).filter(f => f.column != null);
+    if (filters.length) out.filters = filters;
+    if (r.dedupe) out.dedupe = true;
+    if (r.group?.by?.length) out.group = r.group;
+    if (r.sort?.column != null) out.sort = r.sort;
+    return Object.keys(out).length ? out : null;
   }
 
   function inspect(key) {
@@ -115,7 +129,7 @@ export function mountReformatTool(root, options = {}) {
     try {
       const book = await E.openFile(file.name, new Uint8Array(await file.arrayBuffer()));
       files[key] = { name: file.name, book, sheet: null, header: 'auto', info: null };
-      if (key === 'raw') outName = '';
+      if (key === 'raw') { outName = ''; mapping.rows = {}; } // its columns are another file's (a saved mapping brings them back)
       inspect(key);
       if (key === 'template') typedNames = null;
       if (files.raw?.info && files.template?.info) autoMap(false);
@@ -193,7 +207,8 @@ export function mountReformatTool(root, options = {}) {
 
   /** Puts a mapping (from storage or a file) to use on the files loaded. */
   function useMapping(m, label) {
-    mapping = { columns: Array.isArray(m.columns) ? m.columns : [], skipEmptyRows: m.skipEmptyRows !== false };
+    const rows = m.rows && typeof m.rows === 'object' ? JSON.parse(JSON.stringify(m.rows)) : {};
+    mapping = { columns: Array.isArray(m.columns) ? m.columns : [], skipEmptyRows: m.skipEmptyRows !== false, rows };
     typedNames = Array.isArray(m.templateColumns) && m.templateColumns.length ? m.templateColumns : null;
     for (const key of ['raw', 'template']) {
       if (files[key] && m[key]) {
@@ -341,9 +356,11 @@ export function mountReformatTool(root, options = {}) {
       sheetSelect.addEventListener('change', () => changeSide(key, 'sheet', sheetSelect.value));
       controls.unshift(el('label', { class: 'rf-field' }, el('span', {}, 'Sheet'), sheetSelect));
     }
+    const after = key === 'raw' && preview && rowSettings() ? `, ${preview.rowCount} after the row settings` : '';
     out.append(el('div', { class: 'rf-controls' }, controls),
-      el('div', { class: 'rf-stats' }, `${info.columns.length} columns`, key === 'raw' ? ` · ${info.rowCount} rows` : ''),
+      el('div', { class: 'rf-stats' }, `${info.columns.length} columns`, key === 'raw' ? ` · ${info.rowCount} rows${after}` : ''),
       folding(`peek-${key}`, false, key === 'raw' ? 'First rows' : 'Its columns', dataTable(info.columns.map(c => `${c.letter} · ${c.name}`), info.rows.slice(0, 8))));
+    if (key === 'raw' && files.template?.info) out.append(rowsPanel(info.columns));
     if (key === 'template') {
       const names = el('textarea', { rows: '5', placeholder: 'One column name per line' }, (typedNames || info.columns.map(c => c.name)).join('\n'));
       out.append(folding('names', !!typedNames || info.columns.length === 0, 'Type the column names instead',
@@ -354,6 +371,81 @@ export function mountReformatTool(root, options = {}) {
           typedNames ? el('button', { type: 'button', class: 'btn', onclick: () => { typedNames = null; autoMap(false); render(); } }, 'Back to the template\'s') : null)));
     }
     return out;
+  }
+
+  /**
+   * The raw list's rows before they're mapped: leave out empty ones, keep only those passing filters, leave out
+   * exact copies, combine the rows of one user into one, sort. Run in that order (processRows in the engine).
+   */
+  function rowsPanel(rawCols) {
+    const r = mapping.rows || (mapping.rows = {});
+    const colName = i => { const c = rawCols.find(x => x.index === i); return c ? `${c.letter} · ${c.name}` : `column ${E.letter(i)}`; };
+    const colSelect = (value, onPick, blank) => {
+      const s = el('select', {}, blank ? el('option', { value: '' }, blank) : null,
+        rawCols.map(c => el('option', { value: String(c.index), selected: value === c.index }, `${c.letter} · ${c.name}`)));
+      s.addEventListener('change', () => onPick(s.value === '' ? null : Number(s.value)));
+      return s;
+    };
+
+    // Filters: every one must pass.
+    r.filters = r.filters || [];
+    const filterRows = r.filters.map((f, i) => {
+      const op = el('select', {}, E.FILTERS.map(x => el('option', { value: x.op, selected: x.op === (f.op || 'is') }, x.label)));
+      op.addEventListener('change', () => { f.op = op.value; changed(); });
+      const needsValue = !['empty', 'not_empty'].includes(f.op || 'is');
+      const value = needsValue ? el('input', { type: 'text', 'data-key': `filter-${i}`, value: f.value ?? '', placeholder: f.op === 'matches' ? 'e.g. ^svc_' : f.op === 'above' || f.op === 'below' ? 'a date or number' : (f.op || 'is').startsWith('is') ? 'Active, Enabled' : 'text', 'aria-label': 'Value' }) : null;
+      value?.addEventListener('input', () => { f.value = value.value; schedulePreview(); });
+      return el('div', { class: 'rf-row' }, el('span', { class: 'muted small' }, i ? 'and' : 'Keep rows where'),
+        colSelect(f.column, c => { f.column = c; changed(); }), op, value,
+        el('button', { type: 'button', class: 'rf-x', title: 'Remove this filter', onclick: () => { r.filters.splice(i, 1); changed(); } }, '×'));
+    });
+    const addFilter = el('button', { type: 'button', class: 'btn', onclick: () => { r.filters.push({ column: rawCols[0]?.index ?? 0, op: 'is', value: '' }); changed(); } },
+      r.filters.length ? '+ another filter' : '+ Keep only rows where…');
+
+    // Grouping: the rows of one user (by the columns picked) become one row.
+    const g = r.group || (r.group = { by: [] });
+    g.by = g.by || [];
+    const byChips = g.by.map((c, i) => el('span', { class: 'rf-step' }, el('span', { class: 'rf-step-name' }, colName(c)),
+      el('button', { type: 'button', class: 'rf-x', title: 'Stop grouping by this column', onclick: () => { g.by.splice(i, 1); changed(); } }, '×')));
+    const addBy = colSelect(null, c => { if (c != null && !g.by.includes(c)) g.by.push(c); changed(); }, g.by.length ? '+ and…' : 'pick a column (e.g. the login)…');
+    addBy.classList.add('rf-add');
+    let groupBody = null;
+    if (g.by.length) {
+      g.how = g.how || {};
+      const sep = el('input', { type: 'text', class: 'rf-step-input', 'data-key': 'group-sep', value: g.sep ?? ', ', 'aria-label': 'Separator' });
+      sep.addEventListener('input', () => { g.sep = sep.value; schedulePreview(); });
+      const hows = rawCols.filter(c => !g.by.includes(c.index)).map(c => {
+        const s = el('select', {}, E.GROUP_HOW.map(h => el('option', { value: h.how, selected: h.how === (g.how[String(c.index)] || 'join') }, h.label)));
+        s.addEventListener('change', () => { if (s.value === 'join') delete g.how[String(c.index)]; else g.how[String(c.index)] = s.value; changed(); });
+        return el('label', { class: 'rf-field' }, el('span', {}, `${c.letter} · ${c.name}`), s);
+      });
+      groupBody = [
+        el('p', { class: 'muted small' }, 'Each of the other columns becomes:'),
+        el('div', { class: 'rf-how' }, hows),
+        el('label', { class: 'rf-field' }, el('span', {}, 'Joined with'), sep,
+          el('span', { class: 'muted small' }, 'Joined values skip repeats (any case). Highest / lowest read dates and numbers as such.')),
+      ];
+    }
+
+    // Sorting.
+    const sort = r.sort || {};
+    const order = el('select', { disabled: sort.column == null }, el('option', { value: '' }, 'A to Z, low to high, oldest first'), el('option', { value: 'desc', selected: !!sort.desc }, 'Z to A, high to low, newest first'));
+    order.addEventListener('change', () => { r.sort = { ...sort, desc: order.value === 'desc' }; changed(); });
+
+    const active = !!rowSettings();
+    return folding('rows', active, el('span', {}, 'Rows: combine a user\'s rows, filter, sort', active ? el('span', { class: 'rf-on' }, ' · on') : null),
+      el('div', { class: 'rf-rows' },
+        el('div', { class: 'rf-rows-part' },
+          el('label', { class: 'rf-check' }, el('input', { type: 'checkbox', checked: mapping.skipEmptyRows !== false, onchange: e => { mapping.skipEmptyRows = e.target.checked; changed(); } }), ' Leave out empty rows'),
+          el('label', { class: 'rf-check' }, el('input', { type: 'checkbox', checked: !!r.dedupe, onchange: e => { r.dedupe = e.target.checked; changed(); } }), ' Leave out rows that are exact copies of one above')),
+        el('div', { class: 'rf-rows-part' }, filterRows, el('div', { class: 'rf-row' }, addFilter)),
+        el('div', { class: 'rf-rows-part' },
+          el('div', { class: 'rf-row' }, el('span', { class: 'rf-label' }, 'Combine rows with the same'), byChips, addBy),
+          groupBody),
+        el('div', { class: 'rf-rows-part' },
+          el('div', { class: 'rf-row' }, el('span', { class: 'rf-label' }, 'Sort by'),
+            colSelect(sort.column ?? null, c => { r.sort = c == null ? {} : { ...sort, column: c }; changed(); }, 'the file\'s order'), order)),
+        el('p', { class: 'muted small' }, 'Done in this order: empty rows, filters, copies, combining, sorting. Columns are the raw list\'s; they\'re saved with the mapping.')));
   }
 
   /** A <details> that stays open across redraws. */
@@ -458,7 +550,6 @@ export function mountReformatTool(root, options = {}) {
         el('span', { class: 'muted small' }, preview ? `${preview.rowCount} rows${preview.rowCount > preview.rows.length ? `, first ${preview.rows.length} shown` : ''}` : '')),
       previewError ? el('div', { class: 'rf-error' }, previewError) : null,
       preview ? dataTable(cols.map(c => c.name), preview.rows) : el('p', { class: 'muted' }, 'Working out the preview…'),
-      el('label', { class: 'rf-check' }, el('input', { type: 'checkbox', checked: mapping.skipEmptyRows !== false, onchange: e => { mapping.skipEmptyRows = e.target.checked; schedulePreview(0); } }), ' Leave out empty rows'),
       el('div', { class: 'rf-row rf-export' },
         el('label', { class: 'rf-field' }, el('span', {}, 'File name'), name),
         el('span', { class: 'grow' }),

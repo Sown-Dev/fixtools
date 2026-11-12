@@ -192,6 +192,19 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 .rf-page select.rf-add { font-size: 12px; padding: 3px 6px; }
 .rf-sample { color: var(--muted); font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-check { font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.rf-rows { display: flex; flex-direction: column; gap: 10px; }
+.rf-rows-part { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.rf-rows-part:first-child { padding-top: 0; border-top: 0; }
+.rf-rows select { max-width: 240px; }
+.rf-label { font-size: 13px; color: var(--muted); }
+.rf-how { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; }
+.rf-how .rf-field { justify-content: space-between; }
+.rf-how .rf-field > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-on { color: var(--accent); }
+.rf-page .rf-rows input[type=text] { width: 120px; }
+.rf-rows .rf-row select { max-width: 140px; }
+.rf-rows .rf-row { gap: 6px; }
+.rf-rows .rf-field > span:first-child { white-space: nowrap; }
 .rf-page .rf-export input.rf-name { width: 320px; }
 .rf-empty { text-align: center; color: var(--muted); padding: 30px; border: 1px dashed var(--line); border-radius: 10px; }
 .rf-error { border: 1px solid #7a2a24; background: #2a1514; border-radius: 6px; padding: 6px 8px; font-size: 12px; }

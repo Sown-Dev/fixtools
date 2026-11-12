@@ -1076,15 +1076,140 @@ export const ReformatEngine = (() => {
     return template.columns;
   }
 
+  // ---------------------------------------------------------------- the raw rows, before mapping (process_rows)
+
+  const FILTERS = [
+    ['is', 'is one of'], ['is_not', 'is none of'], ['contains', 'contains'], ['not_contains', 'doesn\'t contain'],
+    ['starts', 'starts with'], ['empty', 'is empty'], ['not_empty', 'isn\'t empty'], ['matches', 'matches regex'],
+    ['above', 'is after / more than'], ['below', 'is before / less than'],
+  ].map(([op, label]) => ({ op, label }));
+
+  const GROUP_HOW = [
+    ['join', 'all its values, joined'], ['first', 'the first value'], ['last', 'the last value'],
+    ['max', 'the highest / latest'], ['min', 'the lowest / earliest'], ['count', 'how many rows'],
+  ].map(([how, label]) => ({ how, label }));
+
+  /** Numbers, then dates, then text, each in its own order: [0, number], [1, "YYYYmmddHHMMSSffffff"], [2, text]. */
+  function sortKey(value) {
+    const v = value.trim();
+    if (/^[-+]?(\d+\.?\d*|\.\d+)$/.test(v)) return [0, Number(v)];
+    for (const f of DATE_INPUTS) {
+      const d = strptime(v, f);
+      if (d) return [1, strftime(d, '%Y%m%d%H%M%S%f')];
+    }
+    return [2, v.toLowerCase()];
+  }
+
+  const compareKeys = (a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0);
+  const keyText = v => v.replace(/\s+/g, ' ').trim().toLowerCase();
+
+  function passes(row, f) {
+    const col = int(f.column, -1);
+    const v = col >= 0 && col < row.length ? row[col].trim() : '';
+    const op = f.op || 'is';
+    const want = String(f.value ?? '').trim();
+    switch (op) {
+      case 'is': case 'is_not': {
+        const hit = want ? want.split(',').map(keyText).includes(keyText(v)) : v === '';
+        return op === 'is' ? hit : !hit;
+      }
+      case 'contains': case 'not_contains': {
+        const hit = v.toLowerCase().includes(want.toLowerCase());
+        return op === 'contains' ? hit : !hit;
+      }
+      case 'starts': return v.toLowerCase().startsWith(want.toLowerCase());
+      case 'empty': return v === '';
+      case 'not_empty': return v !== '';
+      case 'matches': return pyRegex(want).test(v);
+      case 'above': case 'below': {
+        if (!v || !want) return false;
+        const a = sortKey(v), b = sortKey(want);
+        if (a[0] !== b[0]) return false; // a date against a number, say: neither
+        return op === 'above' ? compareKeys(a, b) > 0 : compareKeys(a, b) < 0;
+      }
+      default: return true;
+    }
+  }
+
+  /** One column of a group of rows as one value. */
+  function combine(values, how, sep) {
+    if (how === 'count') return String(values.length);
+    const filled = values.filter(v => v.trim());
+    if (!filled.length) return '';
+    if (how === 'first') return filled[0];
+    if (how === 'last') return filled[filled.length - 1];
+    if (how === 'max' || how === 'min') {
+      const keys = filled.map(sortKey);
+      let best = 0;
+      for (let i = 1; i < filled.length; i++) {
+        if (keys[i][0] !== keys[best][0]) continue; // a number and a date don't compare: the first kind found counts
+        const c = compareKeys(keys[i], keys[best]);
+        if (how === 'max' ? c > 0 : c < 0) best = i;
+      }
+      return filled[best];
+    }
+    const seen = new Set(), out = [];
+    for (const v of filled) {
+      const k = keyText(v);
+      if (!seen.has(k)) { seen.add(k); out.push(v); }
+    }
+    return out.join(sep);
+  }
+
+  /**
+   * The raw data rows after the mapping's row settings: empty rows left out, filters, exact duplicates left out,
+   * rows grouped, sorted. See process_rows in reformat.py for the settings.
+   */
+  function processRows(raw, mapping) {
+    let rows = raw.rows;
+    if (mapping.skipEmptyRows !== false) rows = rows.filter(r => r.some(v => v.trim()));
+    const settings = mapping.rows || {};
+    const filters = (settings.filters || []).filter(f => f.column != null);
+    if (filters.length) rows = rows.filter(r => filters.every(f => passes(r, f)));
+    if (settings.dedupe) {
+      const seen = new Set();
+      rows = rows.filter(r => { const k = JSON.stringify(r); if (seen.has(k)) return false; seen.add(k); return true; });
+    }
+    const group = settings.group || {};
+    const by = (group.by || []).map(i => int(i, -1)).filter(i => i >= 0);
+    if (by.length) {
+      const how = group.how || {};
+      const sep = group.sep ?? ', ';
+      const groups = new Map();
+      rows.forEach((r, n) => {
+        const parts = by.map(i => (i < r.length ? keyText(r[i]) : ''));
+        const key = parts.some(Boolean) ? JSON.stringify(parts) : `alone ${n}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(r);
+      });
+      const width = Math.max(0, ...rows.map(r => r.length));
+      rows = [...groups.values()].map(members => {
+        const row = [];
+        for (let c = 0; c < width; c++) {
+          const values = members.map(m => (c < m.length ? m[c] : ''));
+          row.push(by.includes(c) ? (values.find(v => v.trim()) ?? '') : combine(values, how[String(c)] || 'join', sep));
+        }
+        return row;
+      });
+    }
+    const sort = settings.sort || {};
+    if (sort.column != null) {
+      const col = int(sort.column, -1);
+      const filled = c => col >= 0 && col < c.length && c[col].trim();
+      const keyed = rows.filter(filled).map(r => [sortKey(r[col]), r]);
+      keyed.sort((a, b) => (sort.desc ? -1 : 1) * compareKeys(a[0], b[0]));
+      rows = [...keyed.map(k => k[1]), ...rows.filter(r => !filled(r))];
+    }
+    return rows;
+  }
+
   /** The output rows, one value per template column, in the template's order. */
   function transform(raw, template, mapping, limit = null) {
     const rules = new Map();
     for (const rule of mapping.columns || []) rules.set(Number(rule.target ?? -1), compileColumn(rule, raw.columns));
     const targets = template.columns.map(c => c.index);
-    const skipEmpty = mapping.skipEmptyRows !== false;
     const out = [];
-    for (const row of raw.rows) {
-      if (skipEmpty && !row.some(v => v.trim())) continue;
+    for (const row of processRows(raw, mapping)) {
       out.push(targets.map(t => (rules.has(t) ? rules.get(t)(row) : '')));
       if (limit && out.length >= limit) break;
     }
@@ -1092,7 +1217,7 @@ export const ReformatEngine = (() => {
   }
 
   function rowCount(raw, mapping) {
-    return mapping.skipEmptyRows !== false ? raw.rows.filter(r => r.some(v => v.trim())).length : raw.rows.length;
+    return processRows(raw, mapping).length;
   }
 
   // ---------------------------------------------------------------- writing
@@ -1189,7 +1314,7 @@ export const ReformatEngine = (() => {
   }
 
   return {
-    EMAIL_DOMAIN, STEPS, letter, openFile, table, autoMap, applyStep, nameToEmail, transform, rowCount, templateColumns, exportFile,
+    EMAIL_DOMAIN, STEPS, FILTERS, GROUP_HOW, letter, openFile, table, autoMap, applyStep, nameToEmail, processRows, transform, rowCount, templateColumns, exportFile,
     /** For tests outside a browser: the raw-deflate inflater to use. */
     setInflate(fn) { inflateRaw = fn; },
     _internal: { ratio, strptime, strftime, parseCsv, delimiter, serialText, isDateFormat, zip, unzip, rk },
