@@ -216,7 +216,9 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
   .rf-source, .rf-text, .rf-page .rf-export input.rf-name { width: 100%; }
 }
 
-/* Other web pages in a tab (pages.js). */
-.page-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; font-size: 13px; }
-.page-bar a { color: var(--accent); }
-.page-frame { display: block; width: 100%; height: calc(100vh - 150px); min-height: 480px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+/* Other web pages in a tab (pages.js): the frame fills the window under the top bar. */
+body.full-page { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+body.full-page main { flex: 1; min-height: 0; max-width: none; margin: 0; padding: 0; display: flex; }
+body.full-page main > :not([hidden]) { flex: 1; display: flex; min-width: 0; }
+.page-frame { flex: 1; display: block; width: 100%; min-height: 0; border: 0; background: var(--bg); }
+.page-open { flex: none; font-size: 12px; color: var(--accent); white-space: nowrap; }

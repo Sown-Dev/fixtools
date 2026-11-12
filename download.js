@@ -10,7 +10,7 @@ const MODULES = ['dom.js', 'version.js', 'transport.js', 'tidal.js', 'reformat-e
 const FILE_NAME = 'mishtools.html';
 /** Every file of the site, for a reload that refreshes them all in the browser's cache. */
 export const SITE_FILES = ['index.html', 'style.css', ...MODULES];
-/** Where the newest version lives: a downloaded copy checks it to tell when it's out of date. */
+/** The live site: only a copy there checks whether it's out of date; a downloaded copy shows its pages from it. */
 export const LIVE_SITE = 'https://sown-dev.github.io/mishtools/';
 
 /** SHA-256 of text, base64. crypto.subtle only exists on https (and localhost / files), so on a plain-http
@@ -91,7 +91,7 @@ export async function buildStandalone() {
   const safeJs = js.replace(/<\/script/gi, '<\\/script');
   const safeCss = css.replace(/<\/style/gi, '<\\/style');
   // The same locked-down policy as the site, with the inline style and script allowed by their hashes.
-  const policy = `default-src 'none'; script-src 'sha256-${await sha256(safeJs)}'; style-src 'sha256-${await sha256(safeCss)}'; connect-src ${LIVE_SITE}version.js; frame-src ${LIVE_SITE}pages/; base-uri 'none'`;
+  const policy = `default-src 'none'; script-src 'sha256-${await sha256(safeJs)}'; style-src 'sha256-${await sha256(safeCss)}'; frame-src ${LIVE_SITE}pages/; base-uri 'none'`;
   return `<!doctype html>
 <html lang="en">
 <head>
