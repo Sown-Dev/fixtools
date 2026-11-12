@@ -15,11 +15,25 @@ export function pageUrl(file) {
   return `${downloaded ? LIVE_SITE : ''}pages/${file}`;
 }
 
-/** A tab's page: the web page in a frame filling the window under the top bar (whose "Open in its own tab"
- * link app.js shows). Returns show(), which loads it. */
+/**
+ * A tab's page: the web page in a frame filling the window under the top bar (whose "Open in its own tab" link
+ * app.js shows). Returns show(), which loads it.
+ *
+ * The frame is sized here, in pixels, not by style.css alone: a browser that kept an older stylesheet in its
+ * cache (or lays out frames differently) would otherwise draw it at the default 300 x 150.
+ */
 export function mountPage(page, info) {
   const url = pageUrl(info.file);
   const frame = el('iframe', { class: 'page-frame', title: info.name });
+  Object.assign(frame.style, { position: 'fixed', left: '0', width: '100%', border: '0', margin: '0' });
   page.append(frame);
-  return { show() { if (!frame.getAttribute('src')) frame.setAttribute('src', url); } };
+  const bar = document.querySelector('.top');
+  const fit = () => {
+    const top = bar ? Math.round(bar.getBoundingClientRect().bottom) : 0;
+    frame.style.top = `${top}px`;
+    frame.style.height = `${Math.max(0, window.innerHeight - top)}px`;
+  };
+  window.addEventListener('resize', fit);
+  if (bar && window.ResizeObserver) new ResizeObserver(fit).observe(bar);
+  return { show() { fit(); if (!frame.getAttribute('src')) frame.setAttribute('src', url); } };
 }
