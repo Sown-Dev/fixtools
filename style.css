@@ -215,3 +215,8 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
   .rf-files { grid-template-columns: 1fr; }
   .rf-source, .rf-text, .rf-page .rf-export input.rf-name { width: 100%; }
 }
+
+/* Other web pages in a tab (pages.js). */
+.page-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; font-size: 13px; }
+.page-bar a { color: var(--accent); }
+.page-frame { display: block; width: 100%; height: calc(100vh - 150px); min-height: 480px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }

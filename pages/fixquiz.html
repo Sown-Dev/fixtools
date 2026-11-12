@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIX Protocol Flashcard Quiz Engine</title>
+    <link rel="icon" type="image/x-icon" href="/static/fixicon.ico">
+
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-2xl bg-slate-800 rounded-xl shadow-2xl p-6 border border-slate-700">
+
+        <div id="start-page">
+            <h1 class="text-3xl font-bold text-center mb-2 text-emerald-400">FIX Tag Quiz Configurator</h1>
+            <p class="text-slate-400 text-center mb-6 text-sm">Your preferences are saved locally for future sessions.
+            </p>
+
+            <div class="space-y-6">
+                <div>
+                    <h2 class="text-lg font-semibold mb-2 text-slate-200 border-b border-slate-700 pb-1">1. Select
+                        Question Modes</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+                        <label
+                            class="flex items-start p-3 bg-slate-750 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-700 transition">
+                            <input type="checkbox" id="type-tag-to-name" class="mt-1 mr-3 accent-emerald-500">
+                            <div>
+                                <span class="font-medium block text-sm">Tag ID → Name</span>
+                            </div>
+                        </label>
+                        <label
+                            class="flex items-start p-3 bg-slate-750 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-700 transition">
+                            <input type="checkbox" id="type-name-to-desc" class="mt-1 mr-3 accent-emerald-500">
+                            <div>
+                                <span class="font-medium block text-sm">Name → Description</span>
+                            </div>
+                        </label>
+                        <label
+                            class="flex items-start p-3 bg-slate-750 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-700 transition">
+                            <input type="checkbox" id="type-enum" class="mt-1 mr-3 accent-emerald-500">
+                            <div>
+                                <span class="font-medium block text-sm">Enums & Values</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold mb-2 text-slate-200 border-b border-slate-700 pb-1">2. Quiz
+                        Constraints</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                        <div>
+                            <label for="question-limit" class="block text-sm font-medium text-slate-400 mb-1">Number of
+                                Questions (1 - 100)</label>
+                            <input type="number" id="question-limit" min="1" max="100" placeholder="e.g. 10"
+                                class="w-full bg-slate-750 border border-slate-700 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                            <span class="text-[11px] text-slate-500 mt-0.5 block">Leave blank or enter '0' to include
+                                all available questions.</span>
+                        </div>
+                        <div>
+                            <label for="choices-count" class="block text-sm font-medium text-slate-400 mb-1">Multiple
+                                Choice Options (2 - 6)</label>
+                            <input type="number" id="choices-count" min="2" max="6" placeholder="e.g. 4"
+                                class="w-full bg-slate-750 border border-slate-700 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                            <span class="text-[11px] text-slate-500 mt-0.5 block">Defines the maximum size of the
+                                generated options pool.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-2 border-b border-slate-700 pb-1">
+                        <h2 class="text-lg font-semibold text-slate-200">3. Target Fields</h2>
+                        <div class="space-x-2 text-xs">
+                            <button type="button" onclick="toggleAllTags(true)"
+                                class="text-emerald-400 hover:underline cursor-pointer">Select All</button>
+                            <span class="text-slate-500">|</span>
+                            <button type="button" onclick="toggleAllTags(false)"
+                                class="text-slate-400 hover:underline cursor-pointer">Clear All</button>
+                        </div>
+                    </div>
+                    <div id="tags-selector-grid"
+                        class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-80 overflow-y-auto pr-1 mt-2">
+                    </div>
+                </div>
+
+                <button id="start-btn"
+                    class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-lg shadow-lg hover:shadow-emerald-500/20 transition duration-200 text-center block text-lg cursor-pointer">
+                    Launch Quiz
+                </button>
+            </div>
+        </div>
+
+        <div id="quiz-page" class="hidden">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-6">
+                <span id="progress-tracker"
+                    class="text-sm font-semibold tracking-wider text-slate-400 uppercase">Question 0/0</span>
+                <span id="score-tracker"
+                    class="text-sm font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md">Score: 0</span>
+            </div>
+
+            <div class="mb-8">
+                <span id="question-context"
+                    class="text-xs font-bold tracking-widest text-emerald-500 uppercase block mb-1">QUESTION TYPE</span>
+                <h2 id="question-text" class="text-xl sm:text-2xl font-bold text-slate-100 leading-snug"></h2>
+            </div>
+
+            <div id="choices-container" class="grid grid-cols-1 gap-3 mb-6">
+            </div>
+
+            <div id="feedback-panel" class="hidden p-4 rounded-lg mb-6 border font-medium text-sm">
+            </div>
+
+            <button id="next-btn"
+                class="hidden w-full py-3 bg-slate-700 hover:bg-slate-600 font-bold rounded-lg transition text-center cursor-pointer">
+                Next Question →
+            </button>
+        </div>
+
+        <div id="summary-page" class="hidden text-center py-6">
+            <div
+                class="w-20 h-20 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-100 mb-2">Quiz Complete!</h1>
+            <p class="text-slate-400 mb-6">Great job parsing your configuration dataset.</p>
+
+            <div class="bg-slate-750 border border-slate-700 rounded-lg p-4 inline-block min-w-[200px] mb-8">
+                <span class="text-xs uppercase font-bold text-slate-400 tracking-wider block">Final Accuracy</span>
+                <span id="final-score" class="text-4xl font-black text-emerald-400">0%</span>
+                <span id="final-raw-score" class="text-xs block text-slate-400 mt-1">0 out of 0 right</span>
+            </div>
+
+            <button onclick="resetQuizToStart()"
+                class="w-full py-3 bg-slate-700 hover:bg-slate-600 font-bold rounded-lg transition cursor-pointer">
+                Configure New Session
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Updated data records synchronized with protocol context specifications
+        const fixTags = {
+            6: { "name": "AvgPx", "description": "Average price of executions on this order" },
+            7: { "name": "BeginSeqNo", "description": "Beginning sequence number for resends" },
+            8: {
+                "name": "BeginString",
+                "description": "Indicates the beginning of a message and its version"
+            },
+            9: { "name": "BodyLength", "description": "Specifies the length of the message body" },
+            10: { "name": "CheckSum", "description": "The tag at the end of every fix message, always 3 characters" },
+            11: { "name": "ClOrdID", "description": "Client order ID" },
+            14: { "name": "CumQty", "description": "Cumulative quantity filled" },
+            15: { "name": "Currency", "description": "Currency code (e.g., USD, EUR)" },
+            20: {
+                "name": "ExecTransType",
+                "description": "Identifies transaction type",
+                "enumvalues": {
+                    "0": "New",
+                    "1": "Cancel",
+                    "2": "Correct",
+                    "3": "Status"
+                }
+            },
+            21: {
+                "name": "HandlInst",
+                "description": "Instructions for order handling",
+                "enumvalues": {
+                    "1": "Automated execution order, private, no broker intervention",
+                    "2": "Automated execution order, public, broker intervention OK",
+                    "3": "Manual order, best efforts"
+                }
+            },
+            22: {
+                "name": "SecurityIDSource",
+                "description": "Identifies the type of security identifier being used. 1 = CUSIP; 4 = ISIN; 2 = SEDOL",
+                "enumvalues": {
+                    "1": "CUSIP",
+                    "2": "SEDOL",
+                    "3": "QUIK",
+                    "4": "ISIN",
+                    "5": "RIC Code"
+                }
+            },
+            34: { "name": "MsgSeqNum", "description": "Sequence number of the message" },
+            35: {
+                "name": "MsgType",
+                "description": "Identifies the message type",
+                "enumvalues": {
+                    "0": "Heartbeat",
+                    "1": "Test Request",
+                    "2": "Resend Request",
+                    "3": "Reject",
+                    "4": "Sequence Reset",
+                    "5": "Logout",
+                    "8": "Execution Report",
+                    "D": "New Order Single",
+                    "E": "New Order List",
+                    "F": "Cancel Order",
+                    "G": "Cancel Order / Replace"
+
+                }
+            },
+            37: { "name": "OrderID", "description": "Unique identifier of the order assigned by the broker or exchange" },
+            38: { "name": "OrderQty", "description": "Quantity of the order" },
+            39: {
+                "name": "OrdStatus",
+                "description": "Current status of the order",
+                "enumvalues": {
+                    "0": "New",
+                    "1": "Partially Filled",
+                    "2": "Filled",
+                    "4": "Cancelled",
+                    "6": "Pending Cancel",
+                    "8": "Rejected",
+                }
+            },
+            40: {
+                "name": "OrdType",
+                "description": "Type of the order (1=Market, 2=Limit, etc.)",
+                "enumvalues": {
+                    "1": "Market",
+                    "2": "Limit",
+                    "3": "Stop",
+                    "4": "Stop Limit",
+                }
+            },
+            43: {
+                "name": "PossDupFlag",
+                "description": "Flag to indicate a possible duplicate message",
+                "enumvalues": {
+                    "Y": "Possibly duplicate",
+                    "N": "Not a duplicate",
+                },
+            },
+            44: { "name": "Price", "description": "Price of the order" },
+            48: { "name": "SecurityID", "description": "The actual security identifier value, paired with Tag 22" },
+            49: { "name": "SenderCompID", "description": "ID of the sender" },
+            50: { "name": "SenderSubID", "description": "Sender's sub-identifier" },
+            52: { "name": "SendingTime", "description": "Time the message was sent" },
+            54: {
+                "name": "Side",
+                "description": "Side of the order (buy/sell)",
+                "enumvalues": {
+                    "1": "Buy",
+                    "2": "Sell",
+                },
+            },
+            55: { "name": "Symbol", "description": "Ticker symbol of the instrument" },
+            56: { "name": "TargetCompID", "description": "ID of the target recipient" },
+            57: { "name": "TargetSubID", "description": "Recipient sub-identifier" },
+            58: { "name": "Text", "description": "Free format text string" },
+            59: {
+                "name": "TimeInForce",
+                "description": "How long the order remains active (0=Day, 1=GTC, etc.)",
+                "enumvalues": {
+                    "0": "Day",
+                    "1": "GTC (Good Till Cancelled)",
+                    "2": "At the Opening",
+                    "3": "Immediate or Cancel",
+                    "4": "Good Till Crossing",
+                },
+            },
+            60: { "name": "TransactTime", "description": "Time of transaction initiation" },
+            100: { "name": "ExDestination", "description": "Execution destination as defined by institution when order is entered." },
+            102: { "name": "CxlRejReason", "description": "Reason for rejection of order cancellation" },
+            115: {
+                "name": "OnBehalfOfCompID",
+                "description": "End-client identity when a network provider carries orders for multiple clients. e.g., DIN2 = Morgan Stanley",
+            },
+            123: { "name": "GapFillFlag", "description": "Indicates that the Sequence Reset <4> message is replacing administrative or application messages which will not be resent." },
+            150: {
+                "name": "ExecType",
+                "description": "Type of execution (0=New, 1=Partial Fill, 2=Fill, etc.)",
+                "enumvalues": {
+                    "0": "New",
+                    "1": "Partial Fill",
+                    "2": "Fill",
+                    "4": "Cancelled",
+                    "8": "Rejected",
+                },
+            },
+            151: { "name": "LeavesQty", "description": "Quantity left to be filled" },
+            167: { "name": "SecurityType", "description": "Indicates type of security (ISITC spec)" },
+        };
+
+        // State Engine variables
+        let activeQuizQuestions = [];
+        let currentQuestionIndex = 0;
+        let runningScore = 0;
+        let isQuestionAnswered = false;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            renderTagSelectionGrid();
+            setupInputRestrictionFilters();
+            loadSavedPreferences();
+            document.getElementById('start-btn').addEventListener('click', generateQuizSession);
+            document.getElementById('next-btn').addEventListener('click', advanceToNextQuestion);
+        });
+
+        // Enforce range criteria and intercept forbidden letter parameters
+        function setupInputRestrictionFilters() {
+            const inputs = [
+                { id: 'question-limit', min: 0, max: 100 },
+                { id: 'choices-count', min: 2, max: 6 }
+            ];
+
+            inputs.forEach(target => {
+                const element = document.getElementById(target.id);
+
+                // Block explicit non-numeric stroke characters
+                element.addEventListener('keydown', (e) => {
+                    if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+
+                // Clamp values strictly to range boundaries on blur event tracking
+                element.addEventListener('blur', () => {
+                    let currentVal = parseInt(element.value);
+                    if (isNaN(currentVal)) {
+                        element.value = target.min;
+                        return;
+                    }
+                    if (currentVal < target.min) element.value = target.min;
+                    if (currentVal > target.max) element.value = target.max;
+                });
+            });
+        }
+
+        function renderTagSelectionGrid() {
+            const container = document.getElementById('tags-selector-grid');
+            container.innerHTML = '';
+
+            Object.keys(fixTags).forEach(tagId => {
+                const tag = fixTags[tagId];
+                const label = document.createElement('label');
+                label.className = "flex items-center p-2 bg-slate-800 border border-slate-700 rounded text-sm cursor-pointer hover:bg-slate-700 transition";
+                label.innerHTML = `
+                    <input type="checkbox" value="${tagId}" class="tag-checkbox mr-2 accent-emerald-500">
+                    <span class="text-xs text-slate-400 font-mono mr-1.5">[${tagId}]</span>
+                    <span class="font-medium truncate">${tag.name}</span>
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        function toggleAllTags(status) {
+            document.querySelectorAll('.tag-checkbox').forEach(cb => cb.checked = status);
+        }
+
+        function savePreferences() {
+            const selectedTagIds = Array.from(document.querySelectorAll('.tag-checkbox:checked')).map(cb => cb.value);
+
+            const prefs = {
+                tagToName: document.getElementById('type-tag-to-name').checked,
+                nameToDesc: document.getElementById('type-name-to-desc').checked,
+                enum: document.getElementById('type-enum').checked,
+                questionLimit: document.getElementById('question-limit').value,
+                choicesCount: document.getElementById('choices-count').value,
+                selectedTags: selectedTagIds
+            };
+
+            localStorage.setItem('fix_quiz_preferences', JSON.stringify(prefs));
+        }
+
+        function loadSavedPreferences() {
+            const savedData = localStorage.getItem('fix_quiz_preferences');
+
+            if (savedData) {
+                try {
+                    const prefs = JSON.parse(savedData);
+
+                    document.getElementById('type-tag-to-name').checked = prefs.tagToName;
+                    document.getElementById('type-name-to-desc').checked = prefs.nameToDesc;
+                    document.getElementById('type-enum').checked = prefs.enum;
+                    document.getElementById('question-limit').value = prefs.questionLimit !== undefined ? prefs.questionLimit : "10";
+                    document.getElementById('choices-count').value = prefs.choicesCount !== undefined ? prefs.choicesCount : "4";
+
+                    const tagSet = new Set(prefs.selectedTags || []);
+                    document.querySelectorAll('.tag-checkbox').forEach(cb => {
+                        cb.checked = tagSet.has(cb.value);
+                    });
+                    return;
+                } catch (e) {
+                    console.error("Failed to parse preferences payload", e);
+                }
+            }
+
+            // Standard state fallback setup definitions
+            document.getElementById('type-tag-to-name').checked = true;
+            document.getElementById('type-name-to-desc').checked = true;
+            document.getElementById('type-enum').checked = true;
+            document.getElementById('question-limit').value = "10";
+            document.getElementById('choices-count').value = "4";
+            toggleAllTags(true);
+        }
+
+        function generateQuizSession() {
+            const selectedTagIds = Array.from(document.querySelectorAll('.tag-checkbox:checked')).map(cb => parseInt(cb.value));
+            const includeTagToName = document.getElementById('type-tag-to-name').checked;
+            const includeNameToDesc = document.getElementById('type-name-to-desc').checked;
+            const includeEnum = document.getElementById('type-enum').checked;
+
+            let limitCount = parseInt(document.getElementById('question-limit').value) || 0;
+            let targetChoicesCount = parseInt(document.getElementById('choices-count').value) || 4;
+
+            // Secondary inline validation sweeps before operational setup launch
+            if (targetChoicesCount < 2) targetChoicesCount = 2;
+            if (targetChoicesCount > 6) targetChoicesCount = 6;
+            document.getElementById('choices-count').value = targetChoicesCount;
+
+            if (selectedTagIds.length === 0) {
+                alert("Please select at least one tag to study.");
+                return;
+            }
+            if (!includeTagToName && !includeNameToDesc && !includeEnum) {
+                alert("Please select at least one question type mode.");
+                return;
+            }
+
+            savePreferences();
+
+            let pool = [];
+
+            // Operational iteration compilation loop structures
+            selectedTagIds.forEach(tagId => {
+                const tagData = fixTags[tagId];
+
+                if (includeTagToName) {
+                    pool.push({
+                        context: "Tag Lookup Mode",
+                        prompt: `What is the Name of FIX Tag ID ${tagId}?`,
+                        correctAnswer: tagData.name,
+                        pool: Object.values(fixTags).map(t => t.name)
+                    });
+                }
+
+                if (includeNameToDesc) {
+                    pool.push({
+                        context: "Definition Context Mode",
+                        prompt: `What is the functional description for field "${tagData.name}"?`,
+                        correctAnswer: tagData.description,
+                        pool: Object.values(fixTags).map(t => t.description)
+                    });
+                }
+
+                if (includeEnum && tagData.enumvalues) {
+                    Object.keys(tagData.enumvalues).forEach(enumKey => {
+                        const correctStateName = tagData.enumvalues[enumKey];
+
+                        let enumPool = [];
+                        Object.values(fixTags).forEach(t => {
+                            if (t.enumvalues) enumPool.push(...Object.values(t.enumvalues));
+                        });
+
+                        pool.push({
+                            context: `Tag ${tagId} (${tagData.name}) Enum Enumeration`,
+                            prompt: `For FIX Tag ${tagId} (${tagData.name}), what does value "${enumKey}" signify?`,
+                            correctAnswer: correctStateName,
+                            pool: enumPool
+                        });
+                    });
+                }
+            });
+
+            if (pool.length === 0) {
+                alert("No viable questions matching your combined selection filters could be built.");
+                return;
+            }
+
+            pool.sort(() => Math.random() - 0.5);
+
+            if (limitCount <= 0 || limitCount >= pool.length) {
+                activeQuizQuestions = pool;
+            } else {
+                activeQuizQuestions = pool.slice(0, limitCount);
+            }
+
+            document.getElementById('start-page').classList.add('hidden');
+            document.getElementById('quiz-page').classList.remove('hidden');
+
+            currentQuestionIndex = 0;
+            runningScore = 0;
+            displayActiveQuestion();
+        }
+
+        function displayActiveQuestion() {
+            isQuestionAnswered = false;
+            const targetChoicesCount = parseInt(document.getElementById('choices-count').value) || 4;
+
+            document.getElementById('feedback-panel').classList.add('hidden');
+            document.getElementById('next-btn').classList.add('hidden');
+            document.getElementById('score-tracker').innerText = `Score: ${runningScore}`;
+            document.getElementById('progress-tracker').innerText = `Question ${currentQuestionIndex + 1}/${activeQuizQuestions.length}`;
+
+            const qItem = activeQuizQuestions[currentQuestionIndex];
+            document.getElementById('question-context').innerText = qItem.context;
+            document.getElementById('question-text').innerText = qItem.prompt;
+
+            let choices = [qItem.correctAnswer];
+            const uniquePoolFiltered = Array.from(new Set(qItem.pool)).filter(item => item !== qItem.correctAnswer);
+
+            uniquePoolFiltered.sort(() => Math.random() - 0.5);
+            const alternativesCount = Math.min(targetChoicesCount - 1, uniquePoolFiltered.length);
+            for (let i = 0; i < alternativesCount; i++) {
+                choices.push(uniquePoolFiltered[i]);
+            }
+
+            choices.sort(() => Math.random() - 0.5);
+
+            const choicesContainer = document.getElementById('choices-container');
+            choicesContainer.innerHTML = '';
+
+            choices.forEach(choiceText => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-4 bg-slate-750 hover:bg-slate-700 border border-slate-700 rounded-lg font-medium transition active:scale-[0.99] text-sm sm:text-base cursor-pointer duration-150";
+                btn.innerText = choiceText;
+                btn.onclick = () => checkSelectedAnswer(btn, choiceText, qItem.correctAnswer);
+                choicesContainer.appendChild(btn);
+            });
+        }
+
+        function checkSelectedAnswer(clickedButton, selectedVal, trueVal) {
+            if (isQuestionAnswered) return;
+            isQuestionAnswered = true;
+
+            const container = document.getElementById('choices-container');
+            const buttons = container.getElementsByTagName('button');
+            const feedback = document.getElementById('feedback-panel');
+
+            Array.from(buttons).forEach(btn => {
+                btn.disabled = true;
+                btn.classList.remove('hover:bg-slate-700', 'cursor-pointer');
+
+                if (btn.innerText === trueVal) {
+                    btn.classList.add('bg-emerald-500/20', 'border-emerald-500', 'text-emerald-400');
+                }
+            });
+
+            if (selectedVal === trueVal) {
+                runningScore++;
+                feedback.className = "p-4 rounded-lg mb-6 border font-medium text-sm bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
+                feedback.innerHTML = "✨ <strong>Correct!</strong> Your answer aligns with the protocol spec.";
+            } else {
+                clickedButton.classList.add('bg-red-500/20', 'border-red-500', 'text-red-400');
+                feedback.className = "p-4 rounded-lg mb-6 border font-medium text-sm bg-red-500/10 border-red-500/30 text-red-400";
+                feedback.innerHTML = `❌ <strong>Incorrect.</strong> The requested value configuration points to: <br><span class="block mt-1 font-semibold text-slate-200">${trueVal}</span>`;
+            }
+
+            feedback.classList.remove('hidden');
+            document.getElementById('next-btn').classList.remove('hidden');
+            document.getElementById('score-tracker').innerText = `Score: ${runningScore}`;
+        }
+
+        function advanceToNextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < activeQuizQuestions.length) {
+                displayActiveQuestion();
+            } else {
+                showQuizSummary();
+            }
+        }
+
+        // Final view dashboard component metrics definitions logic
+        function showQuizSummary() {
+            document.getElementById('quiz-page').classList.add('hidden');
+            document.getElementById('summary-page').classList.remove('hidden');
+
+            const percent = Math.round((runningScore / activeQuizQuestions.length) * 100);
+            document.getElementById('final-score').innerText = `${percent}%`;
+            document.getElementById('final-raw-score').innerText = `${runningScore} out of ${activeQuizQuestions.length} correct`;
+        }
+
+        function resetQuizToStart() {
+            document.getElementById('summary-page').classList.add('hidden');
+            document.getElementById('start-page').classList.remove('hidden');
+            loadSavedPreferences();
+        }
+    </script>
+</body>
+
+</html>
