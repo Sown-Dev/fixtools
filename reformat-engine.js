@@ -751,7 +751,8 @@ export const ReformatEngine = (() => {
       });
       head = found + 1;
     }
-    return { sheets: got.sheets, sheet: got.sheet, header: head, columns, rows: data };
+    const above = typeof found === 'number' ? rows.slice(0, found) : [];
+    return { sheets: got.sheets, sheet: got.sheet, header: head, columns, rows: data, above };
   }
 
   // ---------------------------------------------------------------- mapping
@@ -1070,11 +1071,29 @@ export const ReformatEngine = (() => {
     return row => steps.reduce((v, s) => applyStep(v, s), base(row));
   }
 
+  /** The names typed in instead, the template's columns, or (no template) the ones saved in the mapping's format. */
   function templateColumns(template, mapping) {
     const names = mapping.templateColumns;
     if (names?.length) return names.map((n, i) => ({ index: i, letter: letter(i), name: n }));
-    return template.columns;
+    if (template) return template.columns;
+    return (mapping.format?.columns || []).map(c => ({ index: Number(c.index), letter: letter(Number(c.index)), name: String(c.name ?? '') }));
   }
+
+  /**
+   * What a mapping keeps of its template so the file isn't needed again (make_format in reformat.py): the sheet's
+   * name, the row of names, the rows above it (up to 20, cut to the columns' width), each column's name and place.
+   */
+  function makeFormat(template, mapping = {}) {
+    const names = mapping.templateColumns;
+    if (names?.length) return { sheet: 'Users', header: 1, above: [], columns: names.map((n, i) => ({ index: i, name: n })) };
+    if (typeof template.header !== 'number') return { sheet: template.sheet || 'Users', header: 1, above: [], columns: template.columns.map((c, i) => ({ index: i, name: c.name })) };
+    const width = Math.max(0, ...template.columns.map(c => c.index + 1));
+    const above = (template.above || []).slice(-20).map(r => r.slice(0, width));
+    return { sheet: template.sheet || 'Users', header: above.length + 1, above, columns: template.columns.map(c => ({ index: c.index, name: c.name })) };
+  }
+
+  /** A name Excel accepts for a sheet. */
+  const sheetName = name => String(name ?? '').replace(/[\\/:*?[\]]/g, '_').replace(/^'+|'+$/g, '').trim().slice(0, 31) || 'Users';
 
   // ---------------------------------------------------------------- the raw rows, before mapping (process_rows)
 
@@ -1231,19 +1250,35 @@ export const ReformatEngine = (() => {
 
   /** A new workbook: one sheet "Users", the names in bold, widths to fit, the top row frozen. */
   function newXlsx(names, rows) {
+    return buildXlsx({ sheet: 'Users', header: 1, above: [], columns: names.map((name, index) => ({ index, name })) }, rows);
+  }
+
+  /**
+   * One sheet laid out as a format says (makeFormat): the rows above, the names in bold on their row, each column in
+   * its place, the rows under them; widths to fit, everything above the data frozen.
+   */
+  function buildXlsx(format, rows) {
     const enc = new TextEncoder();
-    const widths = names.map((n, i) => Math.min(60, Math.max(10, Math.max(n.length, ...rows.slice(0, 500).map(r => (r[i] || '').length)) + 2)));
-    const sheetRowsXml = [names, ...rows].map((r, ri) =>
-      `<row r="${ri + 1}">${r.map((v, ci) => (v !== '' ? cellXml(letter(ci) + (ri + 1), v, ri === 0 ? ' s="1"' : '') : '')).join('')}</row>`).join('');
+    const columns = format.columns.map(c => ({ index: Number(c.index), name: String(c.name ?? '') }));
+    const head = Math.max(1, int(format.header, 1));
+    const widths = columns.map((c, i) => [c.index, Math.min(60, Math.max(10, Math.max(c.name.length, ...rows.slice(0, 500).map(r => (r[i] || '').length)) + 2))])
+      .sort((a, b) => a[0] - b[0]);
+    const rowXml = (r, cells) => `<row r="${r}">${cells.filter(([, v]) => v !== '').sort((a, b) => a[0] - b[0]).map(([c, v, style]) => cellXml(letter(c) + r, v, style || '')).join('')}</row>`;
+    const sheetRowsXml = [
+      ...(format.above || []).slice(0, head - 1).map((row, k) => rowXml(k + 1, row.map((v, c) => [c, String(v ?? '')]))),
+      rowXml(head, columns.map(c => [c.index, c.name, ' s="1"'])),
+      ...rows.map((row, k) => rowXml(head + 1 + k, columns.map((c, i) => [c.index, row[i] ?? '']))),
+    ].join('');
+    const top = `A${head + 1}`;
     const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${names.length ? `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>` : ''}<sheetData>${sheetRowsXml}</sheetData></worksheet>`;
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="${head}" topLeftCell="${top}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${widths.length ? `<cols>${widths.map(([c, w]) => `<col min="${c + 1}" max="${c + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>` : ''}<sheetData>${sheetRowsXml}</sheetData></worksheet>`;
     const parts = [
       ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
       ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
       ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Users" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${escapeXml(sheetName(format.sheet))}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
       ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
       ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -1303,18 +1338,24 @@ export const ReformatEngine = (() => {
    */
   async function exportFile(raw, template, mapping, format, templateName = '') {
     const rawTable = table(raw.book, raw.sheet, raw.header);
-    const tmplTable = table(template.book, template.sheet, template.header);
+    if (!template?.book && !mapping.format?.columns?.length && !mapping.templateColumns?.length) {
+      throw new Error('This mapping has no template saved in it (it was made before they were): load the template file too.');
+    }
+    const tmplTable = template?.book ? table(template.book, template.sheet, template.header) : null;
     const columns = templateColumns(tmplTable, mapping);
-    const rows = transform(rawTable, { ...tmplTable, columns }, mapping);
+    const rows = transform(rawTable, { columns }, mapping);
     const names = columns.map(c => c.name);
     if (format === 'csv') return { bytes: new TextEncoder().encode(csvText(names, rows)), rows: rows.length, type: 'text/csv' };
-    const fill = template.book.kind === 'xlsx' && typeof tmplTable.header === 'number' && !mapping.templateColumns?.length && /\.(xlsx|xlsm|xltx|xltm)$/i.test(templateName || '.xlsx');
-    const bytes = fill ? await fillXlsx(template.book, tmplTable.sheet, tmplTable.header, columns, rows) : newXlsx(names, rows);
+    let bytes;
+    if (!tmplTable && !mapping.templateColumns?.length) bytes = buildXlsx(mapping.format, rows); // the template rebuilt from the mapping
+    else if (tmplTable && template.book.kind === 'xlsx' && typeof tmplTable.header === 'number' && !mapping.templateColumns?.length && /\.(xlsx|xlsm|xltx|xltm)$/i.test(templateName || '.xlsx')) {
+      bytes = await fillXlsx(template.book, tmplTable.sheet, tmplTable.header, columns, rows);
+    } else bytes = newXlsx(names, rows);
     return { bytes, rows: rows.length, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
   }
 
   return {
-    EMAIL_DOMAIN, STEPS, FILTERS, GROUP_HOW, letter, openFile, table, autoMap, applyStep, nameToEmail, processRows, transform, rowCount, templateColumns, exportFile,
+    EMAIL_DOMAIN, STEPS, FILTERS, GROUP_HOW, letter, makeFormat, openFile, table, autoMap, applyStep, nameToEmail, processRows, transform, rowCount, templateColumns, exportFile,
     /** For tests outside a browser: the raw-deflate inflater to use. */
     setInflate(fn) { inflateRaw = fn; },
     _internal: { ratio, strptime, strftime, parseCsv, delimiter, serialText, isDateFormat, zip, unzip, rk },

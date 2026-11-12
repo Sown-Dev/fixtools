@@ -73,6 +73,8 @@ export function mountReformatTool(root, options = {}) {
   const files = { raw: null, template: null }; // { name, book, sheet, header, info }
   let mapping = { columns: [] };
   let typedNames = null; // template column names typed in, instead of the template's own
+  let savedFormat = null; // the template as a mapping saved it (E.makeFormat), used while no template file is loaded
+  let inUse = null; // { label, raw, template }: the mapping picked, so files loaded after it don't re-guess it
   let preview = null;
   let previewError = '';
   let saved = [];
@@ -99,8 +101,20 @@ export function mountReformatTool(root, options = {}) {
     const side = key => ({ sheet: files[key]?.sheet || null, header: files[key]?.header || 'auto' });
     const rows = rowSettings();
     const { rows: _, ...rest } = mapping;
-    return { ...rest, raw: side('raw'), template: side('template'), ...(rows ? { rows } : {}), ...(typedNames ? { templateColumns: typedNames } : {}) };
+    const format = currentFormat();
+    return { ...rest, raw: side('raw'), template: side('template'), ...(rows ? { rows } : {}), ...(typedNames ? { templateColumns: typedNames } : {}), ...(format ? { format } : {}) };
   }
+
+  /** The template, as a mapping keeps it so the file isn't needed again: from the file loaded, or the mapping's. */
+  function currentFormat() {
+    if (files.template?.info) return E.makeFormat(files.template.info, typedNames ? { templateColumns: typedNames } : {});
+    if (typedNames) return E.makeFormat({ columns: [] }, { templateColumns: typedNames });
+    return savedFormat;
+  }
+
+  /** Whether there's a template to map onto: a file, names typed in, or the one saved in the mapping in use. */
+  const haveTemplate = () => !!(files.template?.info || typedNames || savedFormat);
+  const ready = () => !!(files.raw?.info && haveTemplate());
 
   /** The raw list's row settings that are switched on (filters, duplicates, grouping, sorting), or null. */
   function rowSettings() {
@@ -117,7 +131,7 @@ export function mountReformatTool(root, options = {}) {
   function inspect(key) {
     const f = files[key];
     const t = E.table(f.book, f.sheet, f.header);
-    f.info = { sheets: t.sheets, sheet: t.sheet, header: t.header, columns: t.columns, rows: t.rows.slice(0, 30), rowCount: t.rows.length };
+    f.info = { sheets: t.sheets, sheet: t.sheet, header: t.header, columns: t.columns, above: t.above, rows: t.rows.slice(0, 30), rowCount: t.rows.length };
     f.sheet = t.sheet;
   }
 
@@ -128,11 +142,19 @@ export function mountReformatTool(root, options = {}) {
     render();
     try {
       const book = await E.openFile(file.name, new Uint8Array(await file.arrayBuffer()));
-      files[key] = { name: file.name, book, sheet: null, header: 'auto', info: null };
-      if (key === 'raw') { outName = ''; mapping.rows = {}; } // its columns are another file's (a saved mapping brings them back)
+      // With a mapping in use, the file is read the way it says (sheet, row of names) and the mapping kept.
+      const side = inUse?.[key];
+      files[key] = { name: file.name, book, sheet: side?.sheet || null, header: side?.header || 'auto', info: null };
+      if (key === 'raw') {
+        outName = '';
+        if (!inUse) mapping.rows = {}; // the row settings name another file's columns
+      }
       inspect(key);
-      if (key === 'template') typedNames = null;
-      if (files.raw?.info && files.template?.info) autoMap(false);
+      if (key === 'template' && !inUse) typedNames = null;
+      if (ready()) {
+        if (inUse) schedulePreview(0);
+        else autoMap(false);
+      }
     } catch (e) {
       toast(`${file.name}: ${e.message}`, true);
     }
@@ -154,7 +176,7 @@ export function mountReformatTool(root, options = {}) {
 
   /** A first guess at every column (by name, a known synonym, or a close name). Keeps nothing that was set. */
   function autoMap(say = true) {
-    if (!files.raw?.info || !files.template?.info) return;
+    if (!ready()) return;
     mapping.columns = E.autoMap(files.raw.info.columns, templateColumns());
     if (say) toast(`Matched ${mapping.columns.filter(c => c.source != null).length} of ${mapping.columns.length} columns by name`);
     schedulePreview(0);
@@ -166,13 +188,13 @@ export function mountReformatTool(root, options = {}) {
   }
 
   function runPreview() {
-    if (!files.raw?.info || !files.template?.info) return;
+    if (!ready()) return;
     try {
       const m = fullMapping();
       const raw = E.table(files.raw.book, files.raw.sheet, files.raw.header);
-      const template = E.table(files.template.book, files.template.sheet, files.template.header);
+      const template = files.template ? E.table(files.template.book, files.template.sheet, files.template.header) : null;
       const columns = E.templateColumns(template, m);
-      preview = { rows: E.transform(raw, { ...template, columns }, m, 50), rowCount: E.rowCount(raw, m) };
+      preview = { rows: E.transform(raw, { columns }, m, 50), rowCount: E.rowCount(raw, m) };
       previewError = '';
     } catch (e) {
       previewError = e.message;
@@ -184,8 +206,8 @@ export function mountReformatTool(root, options = {}) {
     busy = 'Writing the file…';
     render();
     try {
-      const side = key => ({ book: files[key].book, sheet: files[key].sheet, header: files[key].header });
-      const out = await E.exportFile(side('raw'), side('template'), fullMapping(), format, files.template.name);
+      const side = key => (files[key] ? { book: files[key].book, sheet: files[key].sheet, header: files[key].header } : null);
+      const out = await E.exportFile(side('raw'), side('template'), fullMapping(), format, files.template?.name || '');
       download(`${name}.${format}`, out.bytes, out.type);
       toast(`Exported ${out.rows} rows`);
     } catch (e) {
@@ -205,11 +227,16 @@ export function mountReformatTool(root, options = {}) {
     }
   }
 
-  /** Puts a mapping (from storage or a file) to use on the files loaded. */
+  /**
+   * Puts a mapping (from storage or a file) to use, with or without files loaded: it carries its template, so only
+   * the raw list is needed. Files loaded after it are read the way it says and don't re-guess it.
+   */
   function useMapping(m, label) {
     const rows = m.rows && typeof m.rows === 'object' ? JSON.parse(JSON.stringify(m.rows)) : {};
     mapping = { columns: Array.isArray(m.columns) ? m.columns : [], skipEmptyRows: m.skipEmptyRows !== false, rows };
     typedNames = Array.isArray(m.templateColumns) && m.templateColumns.length ? m.templateColumns : null;
+    savedFormat = Array.isArray(m.format?.columns) && m.format.columns.length ? m.format : null;
+    inUse = { label, raw: m.raw, template: m.template };
     for (const key of ['raw', 'template']) {
       if (files[key] && m[key]) {
         files[key].sheet = m[key].sheet || files[key].sheet;
@@ -217,7 +244,8 @@ export function mountReformatTool(root, options = {}) {
         try { inspect(key); } catch {}
       }
     }
-    toast(`Using "${label}"`);
+    if (!haveTemplate()) toast(`"${label}" was saved before mappings kept their template: load the template file too (and save it again to keep it).`, true);
+    else toast(`Using "${label}"${files.raw ? '' : ': load the raw list'}`);
     schedulePreview(0);
     render();
   }
@@ -299,7 +327,7 @@ export function mountReformatTool(root, options = {}) {
       }
       if (!Array.isArray(data?.columns)) throw new Error('That file isn\'t a mapping or a backup of mappings.');
       const label = file.name.replace(/(\.mapping)?\.json$/i, '');
-      if (files.raw?.info && files.template?.info) useMapping(data, label);
+      useMapping(data, label);
       if (confirm(`Save "${label}" with your mappings ${storage.where || ''}?`.replace(/ \?$/, '?'))) {
         await storage.put(label, data);
         await loadSaved();
@@ -314,7 +342,8 @@ export function mountReformatTool(root, options = {}) {
 
   function templateColumns() {
     if (typedNames) return typedNames.map((n, i) => ({ index: i, letter: '', name: n }));
-    return files.template?.info?.columns || [];
+    if (files.template?.info) return files.template.info.columns;
+    return (savedFormat?.columns || []).map(c => ({ index: Number(c.index), letter: E.letter(Number(c.index)), name: String(c.name ?? '') }));
   }
 
   function rule(target) {
@@ -343,6 +372,13 @@ export function mountReformatTool(root, options = {}) {
     drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); load(key, e.dataTransfer.files[0]); });
 
     const out = el('section', { class: 'rf-card' }, el('div', { class: 'rf-card-head' }, el('h3', {}, title), el('span', { class: 'muted small' }, hint)), drop);
+    if (!f?.info && key === 'template' && (savedFormat || typedNames)) {
+      const cols = templateColumns();
+      out.append(el('div', { class: 'rf-from-mapping' },
+        el('b', {}, `From the mapping "${inUse?.label || ''}"`), el('span', { class: 'muted small' }, ` · ${cols.length} columns, no file needed`),
+        el('div', { class: 'muted small' }, cols.map(c => c.name).join(' · '))));
+      return out;
+    }
     if (!f?.info) return out;
     const info = f.info;
     const headerChoices = [['auto', 'Find them'], ['none', 'There are none (A, B, C…)'], ['column', 'Listed down column A']];
@@ -360,7 +396,7 @@ export function mountReformatTool(root, options = {}) {
     out.append(el('div', { class: 'rf-controls' }, controls),
       el('div', { class: 'rf-stats' }, `${info.columns.length} columns`, key === 'raw' ? ` · ${info.rowCount} rows${after}` : ''),
       folding(`peek-${key}`, false, key === 'raw' ? 'First rows' : 'Its columns', dataTable(info.columns.map(c => `${c.letter} · ${c.name}`), info.rows.slice(0, 8))));
-    if (key === 'raw' && files.template?.info) out.append(rowsPanel(info.columns));
+    if (key === 'raw' && haveTemplate()) out.append(rowsPanel(info.columns));
     if (key === 'template') {
       const names = el('textarea', { rows: '5', placeholder: 'One column name per line' }, (typedNames || info.columns.map(c => c.name)).join('\n'));
       out.append(folding('names', !!typedNames || info.columns.length === 0, 'Type the column names instead',
@@ -525,8 +561,7 @@ export function mountReformatTool(root, options = {}) {
     const select = el('select', { 'aria-label': 'Saved mappings' }, el('option', { value: '' }, saved.length ? `Saved mappings (${saved.length})…` : 'No saved mappings yet'), saved.map(n => el('option', { value: n }, n)));
     select.addEventListener('change', () => {
       if (!select.value) return;
-      if (files.raw?.info && files.template?.info) useSaved(select.value);
-      else { toast('Load both files first, then pick the mapping.', true); select.value = ''; }
+      useSaved(select.value);
     });
     const fileInput = el('input', { type: 'file', accept: '.json,application/json', hidden: true });
     fileInput.addEventListener('change', () => { loadMappingFile(fileInput.files[0]); fileInput.value = ''; });
@@ -544,7 +579,8 @@ export function mountReformatTool(root, options = {}) {
     if (!outName) outName = (files.raw.name || 'users').replace(/\.[^.]+$/, '') + ' - reformatted';
     const name = el('input', { type: 'text', value: outName, class: 'rf-name', 'data-key': 'outname', 'aria-label': 'File name' });
     name.addEventListener('input', () => { outName = name.value; });
-    const tmplIsXlsx = /\.(xlsx|xlsm|xltx|xltm)$/i.test(files.template.name) && files.template.book.kind === 'xlsx' && !typedNames && typeof files.template.info.header === 'number';
+    const tmplIsXlsx = !!files.template && /\.(xlsx|xlsm|xltx|xltm)$/i.test(files.template.name) && files.template.book.kind === 'xlsx' && !typedNames && typeof files.template.info.header === 'number';
+    const fromMapping = !files.template && !typedNames && !!savedFormat;
     return el('section', { class: 'rf-card' },
       el('div', { class: 'rf-card-head' }, el('h3', {}, '3. Check and export'),
         el('span', { class: 'muted small' }, preview ? `${preview.rowCount} rows${preview.rowCount > preview.rows.length ? `, first ${preview.rows.length} shown` : ''}` : '')),
@@ -555,7 +591,9 @@ export function mountReformatTool(root, options = {}) {
         el('span', { class: 'grow' }),
         el('button', { type: 'button', class: 'btn primary', disabled: !!busy, onclick: () => exportFile('xlsx', fileSafe(name.value) || 'reformatted') }, 'Export .xlsx'),
         el('button', { type: 'button', class: 'btn', disabled: !!busy, onclick: () => exportFile('csv', fileSafe(name.value) || 'reformatted') }, 'Export .csv')),
-      el('p', { class: 'muted small' }, tmplIsXlsx ? 'The .xlsx is a copy of your template with the rows filled in under its names, so its titles, styling and widths stay.' : 'The .xlsx is a new sheet with the template\'s column names in bold.'));
+      el('p', { class: 'muted small' }, tmplIsXlsx ? 'The .xlsx is a copy of your template with the rows filled in under its names, so its titles, styling and widths stay.'
+        : fromMapping ? 'The .xlsx rebuilds the template from the mapping: its sheet name, the rows above the names, the names in bold, each column in its place (not its colours or fonts; load the template file for those).'
+          : 'The .xlsx is a new sheet with the template\'s column names in bold.'));
   }
 
   function render() {
@@ -568,8 +606,8 @@ export function mountReformatTool(root, options = {}) {
       el('div', { class: 'rf-files' },
         fileCard('raw', '1. Raw user list', 'from the vendor'),
         fileCard('template', 'Template', 'only its column names are used')));
-    if (files.raw?.info && files.template?.info) page.append(mappingCard(), outputCard());
-    else page.append(el('div', { class: 'rf-empty' }, 'Load both files to map the columns.'));
+    if (ready()) page.append(mappingCard(), outputCard());
+    else page.append(el('div', { class: 'rf-empty' }, haveTemplate() ? `Using "${inUse?.label || ''}": load the raw list.` : 'Load both files to map the columns, or pick a saved mapping and load only the raw list.'));
     // Keep the scroll position and focus across redraws.
     const scroller = options.scroller || root;
     const y = scroller.scrollTop;
