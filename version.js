@@ -1,2 +1,2 @@
 // Written by stamp.mjs before each commit: when this copy was last updated (UTC).
-export const VERSION = '2026-11-11T15:43Z';
+export const VERSION = '2026-11-12T13:51Z';

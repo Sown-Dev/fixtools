@@ -6,7 +6,7 @@
 
 import { el } from './dom.js';
 
-const MODULES = ['dom.js', 'version.js', 'transport.js', 'tidal.js', 'download.js', 'app.js'];
+const MODULES = ['dom.js', 'version.js', 'transport.js', 'tidal.js', 'reformat-engine.js', 'reformat-ui.js', 'download.js', 'app.js'];
 const FILE_NAME = 'fixtools.html';
 /** Every file of the site, for a reload that refreshes them all in the browser's cache. */
 export const SITE_FILES = ['index.html', 'style.css', ...MODULES];

@@ -1,22 +1,42 @@
-// The app's frame: one tab per tool. A new tool is a new line in TOOLS.
+// The app's frame: one tab per tool, the one open kept in the address (#tidal, #reformat). A new tool is a new
+// line in TOOLS.
 
 import { el } from './dom.js';
 import { mountTidal } from './tidal.js';
+import { mountReformatTool } from './reformat-ui.js';
 import { downloadButton, LIVE_SITE, SITE_FILES } from './download.js';
 import { VERSION } from './version.js';
 
 const TOOLS = [
-  { name: 'Tidal Transport Composer', mount: mountTidal },
+  { id: 'tidal', name: 'Tidal Transport Composer', mount: mountTidal },
+  // The user list reformatter: files are read and written in the browser; mappings saved in it, or as files.
+  { id: 'reformat', name: 'User List Reformatter', mount: page => mountReformatTool(page).show() },
 ];
 
 const nav = document.getElementById('tools');
 const main = document.getElementById('tool');
 
+const toolTabs = new Map(); // id -> { page, tab }
 for (const tool of TOOLS) {
   const page = el('div', {});
+  page.hidden = true;
   tool.mount(page);
   main.append(page);
-  nav.append(el('span', { class: 'tab', 'aria-current': 'page' }, tool.name));
+  const tab = el('button', { type: 'button', class: 'tab' }, tool.name);
+  tab.addEventListener('click', () => showTool(tool.id));
+  nav.append(tab);
+  toolTabs.set(tool.id, { page, tab });
+}
+showTool(location.hash.slice(1));
+
+function showTool(id) {
+  if (!toolTabs.has(id)) id = TOOLS[0].id;
+  for (const [key, { page, tab }] of toolTabs) {
+    page.hidden = key !== id;
+    if (key === id) tab.setAttribute('aria-current', 'page');
+    else tab.removeAttribute('aria-current');
+  }
+  history.replaceState(null, '', `#${id}`);
 }
 const version = versionBadge();
 nav.after(version, downloadButton());

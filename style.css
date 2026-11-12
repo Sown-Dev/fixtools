@@ -28,7 +28,9 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline
 
 .top { display: flex; align-items: center; gap: 18px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
 #tools { flex: 1; display: flex; gap: 4px; min-width: 0; }
-.tab { padding: 4px 10px; border-radius: 6px; background: var(--raised); box-shadow: inset 0 -2px 0 var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab { padding: 4px 10px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab:hover { color: var(--text); }
+.tab[aria-current=page] { background: var(--raised); box-shadow: inset 0 -2px 0 var(--accent); color: var(--text); }
 main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
 
 .btn { background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
@@ -138,4 +140,65 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 18px 40px; }
   .copy, .copy * { transition: none !important; animation: none !important; }
   .copy-ripple { display: none; }
   .expand-list, .chevron { animation: none !important; transition: none !important; }
+}
+
+/* The user list reformatter (reformat-ui.js; the same page as the hub's Reformat tab). */
+.rf-page { display: flex; flex-direction: column; gap: 14px; }
+.rf-page input, .rf-page select { font: inherit; font-size: 13px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+.rf-page input:focus, .rf-page select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.rf-page input[type=checkbox] { padding: 0; }
+.rf-page .small { font-size: 12px; }
+.rf-page .grow { flex: 1; }
+.rf-page code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; }
+.rf-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.rf-head h2 { margin: 0; }
+.rf-head p { margin: 4px 0 0; font-size: 13px; }
+.rf-busy { font-size: 12px; color: var(--accent); border: 1px solid #2c6c99; border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
+.rf-saved { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.rf-saved select { max-width: 280px; }
+.rf-files { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rf-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rf-card-head { display: flex; align-items: baseline; gap: 10px; }
+.rf-card-head h3 { margin: 0; font-size: 15px; color: var(--text); }
+.rf-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 76px; border: 1.5px dashed #3a4656; border-radius: 8px; cursor: pointer; text-align: center; padding: 10px; transition: border-color .15s, background .15s; }
+.rf-drop:hover, .rf-drop.over { border-color: var(--accent); background: rgba(127, 200, 255, .05); }
+.rf-drop.loaded { min-height: 52px; border-style: solid; border-color: var(--line); background: var(--raised); }
+.rf-controls { display: flex; gap: 14px; flex-wrap: wrap; }
+.rf-field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.rf-field > span:first-child { color: var(--muted); }
+.rf-stats { font-size: 12px; color: var(--muted); }
+.rf-peek summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.rf-peek[open] summary { margin-bottom: 8px; }
+.rf-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rf-table-wrap { overflow: auto; max-height: 420px; border: 1px solid var(--line); border-radius: 8px; }
+.rf-map-wrap { max-height: none; }
+.rf-table, .rf-map { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.rf-table th, .rf-table td { padding: 5px 9px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.rf-table thead th, .rf-map thead th { position: sticky; top: 0; background: var(--raised); font-weight: 600; z-index: 1; }
+.rf-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, .02); }
+.rf-map th, .rf-map td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.rf-map tbody th { font-weight: 600; white-space: nowrap; }
+.rf-map tr.rf-unmapped .rf-target { color: var(--muted); }
+.rf-map tr.rf-unmapped { background: rgba(232, 184, 74, .04); }
+.rf-source { width: 230px; }
+.rf-text { display: block; margin-top: 6px; width: 230px; font-family: Consolas, "Cascadia Mono", monospace; }
+.rf-steps { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rf-step { display: inline-flex; align-items: center; gap: 4px; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px 2px 8px; font-size: 12px; }
+.rf-step-name { white-space: nowrap; }
+.rf-page input.rf-step-input { width: 120px; padding: 2px 6px; font-size: 12px; }
+.rf-page input.rf-step-input.num { width: 56px; }
+.rf-x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
+.rf-x:hover { color: var(--bad); }
+.rf-page select.rf-add { font-size: 12px; padding: 3px 6px; }
+.rf-sample { color: var(--muted); font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-check { font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.rf-page .rf-export input.rf-name { width: 320px; }
+.rf-empty { text-align: center; color: var(--muted); padding: 30px; border: 1px dashed var(--line); border-radius: 10px; }
+.rf-error { border: 1px solid #7a2a24; background: #2a1514; border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+.rf-toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
+.rf-toast { background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.rf-toast.bad { border-color: #7a2a24; background: #2a1514; }
+@media (max-width: 760px) {
+  .rf-files { grid-template-columns: 1fr; }
+  .rf-source, .rf-text, .rf-page .rf-export input.rf-name { width: 100%; }
 }
